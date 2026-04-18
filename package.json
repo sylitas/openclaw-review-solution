@@ -1,0 +1,31 @@
+{
+  "name": "openclaw-review-solution",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local review loop tool for OpenClaw on macOS",
+  "main": "src/main/main.js",
+  "bin": {
+    "review": "src/cli/review.js"
+  },
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "daemon": "node src/daemon/reviewd.js",
+    "daemon:pm2:start": "pm2 start ecosystem.config.cjs --only openclaw-reviewd",
+    "daemon:pm2:restart": "pm2 restart openclaw-reviewd",
+    "daemon:pm2:stop": "pm2 stop openclaw-reviewd",
+    "daemon:pm2:logs": "pm2 logs openclaw-reviewd",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "check-format": "prettier --check ."
+  },
+  "devDependencies": {
+    "electron": "^41.2.1",
+    "eslint": "^10.2.1",
+    "pm2": "^6.0.14",
+    "prettier": "^3.8.3"
+  },
+  "dependencies": {
+    "mermaid": "^11.14.0"
+  }
+}

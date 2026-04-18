@@ -1,0 +1,7 @@
+flowchart TD
+  A[OpenClaw Agent] --> B[Render Artifact]
+  B --> C[Review App]
+  C --> D{Human Decision}
+  D -->|Approve| E[Return JSON Result]
+  D -->|Request changes| F[Iterate]
+  F --> B
