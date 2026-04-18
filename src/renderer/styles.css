@@ -98,32 +98,16 @@ sl-badge#artifact-type::part(base) {
   letter-spacing: 0.06em;
 }
 
-.icon-trigger-btn {
-  appearance: none;
-  width: 38px;
-  height: 38px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: #10131b;
-  color: var(--text);
-  font: inherit;
+.topbar-icon-btn {
+  width: 40px;
+  height: 40px;
   font-size: 18px;
   font-weight: 800;
-  line-height: 1;
-  cursor: pointer;
 }
 
-.icon-trigger-btn i {
-  width: 18px;
-  height: 18px;
-}
-
-.icon-trigger-btn:hover,
-.icon-trigger-btn:focus-visible,
-.icon-trigger-btn[aria-expanded='true'] {
+.topbar-icon-btn:hover,
+.topbar-icon-btn:focus-visible,
+.topbar-icon-btn[aria-expanded='true'] {
   border-color: var(--accent);
   color: white;
   background: rgba(91, 140, 255, 0.16);
@@ -140,6 +124,10 @@ sl-card.status-popover-card {
   border-radius: 14px;
   border: 1px solid var(--border);
   background: #10131b;
+}
+
+sl-card.status-popover-card.hidden {
+  display: none;
 }
 
 sl-card.help-popover-card {
