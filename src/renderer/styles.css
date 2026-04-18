@@ -383,10 +383,6 @@ body {
 
 /* ── Mermaid diagram isolation (prevent Pico from styling SVG internals) ── */
 
-.mermaid-host svg * {
-  all: revert;
-}
-
 .mermaid-host {
   width: 100%;
   min-height: 200px;
@@ -397,6 +393,15 @@ body {
 
 .mermaid-host svg {
   max-width: 100%;
+}
+
+/* Pico applies margin/padding/border to many elements including SVG children.
+   Reset only the properties Pico touches, preserving Mermaid’s own fill/stroke/font. */
+.mermaid-host :where(div, span, p, text, foreignObject, g, rect, path, line, polygon, polyline, circle, ellipse, marker) {
+  margin: 0;
+  padding: 0;
+  border: none;
+  box-sizing: content-box;
 }
 
 .empty-state {

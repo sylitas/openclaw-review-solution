@@ -17,8 +17,6 @@
           <p id="prompt" class="prompt"></p>
         </div>
         <div class="topbar-actions">
-          <span id="artifact-type" class="badge">UNKNOWN</span>
-
           <div class="popover-group">
             <button
               id="status-info-toggle"
@@ -30,6 +28,11 @@
               i
             </button>
             <div id="status-popover" class="popover-card hidden">
+              <div class="popover-section">
+                <div class="popover-section-title">Artifact</div>
+                <div class="popover-row">Type: <strong id="artifact-type">UNKNOWN</strong></div>
+              </div>
+              <div class="popover-divider"></div>
               <div class="popover-section">
                 <div class="popover-section-title">Connection</div>
                 <div class="status-grid">
