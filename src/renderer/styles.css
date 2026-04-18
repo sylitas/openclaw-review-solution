@@ -386,6 +386,78 @@ body {
   cursor: crosshair;
 }
 
+/* ── SVG annotation styles ── */
+
+.annotation-rect {
+  fill: rgba(197, 210, 240, 0.25);
+  stroke: #6680cc;
+  stroke-width: 2;
+}
+
+.annotation-group.is-selected .annotation-rect {
+  stroke: #5b8cff;
+  stroke-width: 2.5;
+}
+
+.annotation-group.is-draft .annotation-rect {
+  stroke-dasharray: 6 3;
+}
+
+.annotation-arrow {
+  stroke: #e05252;
+  stroke-width: 3;
+  fill: none;
+}
+
+.annotation-group.is-selected .annotation-arrow {
+  stroke: #ff6b6b;
+  stroke-width: 3.5;
+}
+
+.annotation-label-bg {
+  fill: rgba(255, 255, 255, 0.92);
+  stroke: #6680cc;
+  stroke-width: 1;
+}
+
+.annotation-label-text {
+  fill: #1a1a2e;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.annotation-text-bg {
+  fill: rgba(255, 255, 255, 0.92);
+  stroke: #6680cc;
+  stroke-width: 1;
+}
+
+.annotation-text {
+  fill: #1a1a2e;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.annotation-text-fo {
+  color: #1a1a2e;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: Inter, system-ui, sans-serif;
+  line-height: 1.4;
+  padding: 6px 10px;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.handle-circle {
+  fill: white;
+  stroke: #5b8cff;
+  stroke-width: 2;
+  cursor: pointer;
+}
+
 /* ── Mermaid diagram (rendered in isolated iframe) ── */
 
 .mermaid-host {

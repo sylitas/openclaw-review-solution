@@ -935,24 +935,34 @@ function createAnnotationElement(annotation, isDraft) {
 
   if (annotation.type === 'text') {
     const point = denormalizeArtifactPoint(annotation);
-    const labelWidth = measureLabelWidth(annotation.text || '');
+    const textContent = annotation.text || '';
+    const lines = textContent.split('\n');
+    const maxLineLen = Math.max(...lines.map(function (l) { return l.length; }), 1);
+    const foWidth = Math.max(120, maxLineLen * 9 + 24);
+    const foHeight = Math.max(32, lines.length * 22 + 16);
+
     const background = document.createElementNS(SVG_NS, 'rect');
     background.setAttribute('class', 'annotation-text-bg');
     background.setAttribute('x', point.x - 8);
-    background.setAttribute('y', point.y - 20);
+    background.setAttribute('y', point.y - 22);
     background.setAttribute('rx', '8');
     background.setAttribute('ry', '8');
-    background.setAttribute('width', labelWidth);
-    background.setAttribute('height', '28');
+    background.setAttribute('width', foWidth);
+    background.setAttribute('height', foHeight);
 
-    const text = document.createElementNS(SVG_NS, 'text');
-    text.setAttribute('class', 'annotation-text');
-    text.setAttribute('x', point.x);
-    text.setAttribute('y', point.y);
-    text.textContent = annotation.text || '';
+    const fo = document.createElementNS(SVG_NS, 'foreignObject');
+    fo.setAttribute('x', point.x - 8);
+    fo.setAttribute('y', point.y - 22);
+    fo.setAttribute('width', foWidth);
+    fo.setAttribute('height', foHeight);
+
+    const div = document.createElement('div');
+    div.className = 'annotation-text-fo';
+    div.textContent = textContent;
+    fo.appendChild(div);
 
     group.appendChild(background);
-    group.appendChild(text);
+    group.appendChild(fo);
     return group;
   }
 
