@@ -10,8 +10,6 @@ const els = {
   title: document.getElementById('title'),
   prompt: document.getElementById('prompt'),
   artifactType: document.getElementById('artifact-type'),
-  statusInfoToggle: document.getElementById('status-info-toggle'),
-  statusPopover: document.getElementById('status-popover'),
   artifactHost: document.getElementById('artifact-host'),
   viewer: document.getElementById('viewer'),
   viewerStage: document.getElementById('viewer-stage'),
@@ -68,7 +66,6 @@ const state = {
   uiRunning: false,
   daemonError: '',
   isSubmitting: false,
-  infoPopoverOpen: false,
 };
 
 async function boot() {
@@ -90,7 +87,6 @@ async function boot() {
     window.addEventListener('resize', onWindowResize);
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
-    document.addEventListener('pointerdown', onDocumentPointerDown);
     actionsBound = true;
   }
 
@@ -341,8 +337,10 @@ function bindActions() {
     setZoom(1);
   });
 
-  els.inspectorInput.addEventListener('input', function onInspectorInput() {
-    applyInspectorValue(els.inspectorInput.value);
+  ['input', 'sl-input'].forEach((eventName) => {
+    els.inspectorInput.addEventListener(eventName, function onInspectorInput() {
+      applyInspectorValue(els.inspectorInput.value);
+    });
   });
 
   els.inspectorClear.addEventListener('click', function onInspectorClear() {
@@ -356,20 +354,6 @@ function bindActions() {
       updateStatus();
     });
   });
-
-  if (els.statusInfoToggle) {
-    els.statusInfoToggle.addEventListener('click', function onStatusInfoToggle(event) {
-      event.preventDefault();
-      event.stopPropagation();
-      setInfoPopoverOpen(!state.infoPopoverOpen);
-    });
-  }
-
-  if (els.statusPopover) {
-    els.statusPopover.addEventListener('pointerdown', function onStatusPopoverPointerDown(event) {
-      event.stopPropagation();
-    });
-  }
 
   els.annotationLayer.addEventListener('pointerdown', onPointerDown);
   els.annotationLayer.addEventListener('pointermove', onPointerMove);
@@ -1423,34 +1407,6 @@ function updateActionAvailability() {
   els.cancel.disabled = !canSubmit;
 }
 
-function setInfoPopoverOpen(nextOpen) {
-  state.infoPopoverOpen = Boolean(nextOpen);
-
-  if (els.statusPopover) {
-    els.statusPopover.classList.toggle('hidden', !state.infoPopoverOpen);
-  }
-
-  if (els.statusInfoToggle) {
-    els.statusInfoToggle.setAttribute('aria-expanded', state.infoPopoverOpen ? 'true' : 'false');
-  }
-}
-
-function onDocumentPointerDown(event) {
-  if (!state.infoPopoverOpen) {
-    return;
-  }
-
-  if (els.statusPopover && els.statusPopover.contains(event.target)) {
-    return;
-  }
-
-  if (els.statusInfoToggle && els.statusInfoToggle.contains(event.target)) {
-    return;
-  }
-
-  setInfoPopoverOpen(false);
-}
-
 function updateInspector() {
   const annotation = getSelectedAnnotation();
 
@@ -1546,7 +1502,9 @@ function onArtifactReady() {
 function onKeyDown(event) {
   const isInputFocused =
     document.activeElement === els.message ||
-    document.activeElement === els.inspectorInput;
+    document.activeElement === els.inspectorInput ||
+    els.message.matches(':focus-within') ||
+    els.inspectorInput.matches(':focus-within');
 
   if (
     (event.metaKey || event.ctrlKey) &&
@@ -1599,11 +1557,6 @@ function onKeyDown(event) {
   }
 
   if (event.key === 'Escape') {
-    if (state.infoPopoverOpen) {
-      setInfoPopoverOpen(false);
-      return;
-    }
-
     state.draft = null;
     state.dragging = null;
     state.panning = null;

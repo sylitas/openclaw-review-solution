@@ -26,6 +26,8 @@
     "prettier": "^3.8.3"
   },
   "dependencies": {
+    "@shoelace-style/shoelace": "^2.20.1",
+    "lucide": "^1.8.0",
     "mermaid": "^11.14.0"
   }
 }

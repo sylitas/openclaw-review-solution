@@ -6,6 +6,7 @@ module.exports = [
   },
   {
     files: ['src/**/*.js'],
+    ignores: ['src/renderer/vendor.js'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'commonjs',
@@ -19,6 +20,20 @@ module.exports = [
         __dirname: 'readonly',
         Buffer: 'readonly',
         prompt: 'readonly'
+      }
+    },
+    rules: {
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }]
+    }
+  },
+  {
+    files: ['src/renderer/vendor.js'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        window: 'readonly',
+        document: 'readonly'
       }
     },
     rules: {
