@@ -909,7 +909,7 @@ function createAnnotationElement(annotation, isDraft) {
       appendRectInnerLabel(group, annotation.text, box);
     }
 
-    if (isSelected && !isDraft) {
+    if (isSelected && !isDraft && !annotation.text) {
       appendRectHandles(group, annotation);
     }
 
