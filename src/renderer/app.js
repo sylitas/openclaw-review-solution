@@ -2145,4 +2145,13 @@ function startSessionPolling() {
   }, 1000);
 }
 
-boot();
+function waitForShoelace() {
+  var tags = ['sl-button', 'sl-textarea', 'sl-badge', 'sl-card'];
+  return Promise.all(
+    tags.map(function (tag) {
+      return customElements.whenDefined(tag);
+    })
+  );
+}
+
+waitForShoelace().then(boot);

@@ -2,9 +2,10 @@ import { setBasePath } from '../../node_modules/@shoelace-style/shoelace/dist/ut
 
 setBasePath('../../node_modules/@shoelace-style/shoelace/dist');
 
-async function initShoelace() {
-  await import('../../node_modules/@shoelace-style/shoelace/dist/shoelace-autoloader.js');
-}
+import '../../node_modules/@shoelace-style/shoelace/dist/components/badge/badge.js';
+import '../../node_modules/@shoelace-style/shoelace/dist/components/button/button.js';
+import '../../node_modules/@shoelace-style/shoelace/dist/components/card/card.js';
+import '../../node_modules/@shoelace-style/shoelace/dist/components/textarea/textarea.js';
 
 function refreshLucideIcons() {
   if (!window.lucide || typeof window.lucide.createIcons !== 'function') {
@@ -22,15 +23,8 @@ function refreshLucideIcons() {
 
 window.refreshLucideIcons = refreshLucideIcons;
 
-async function initVendorUi() {
-  await initShoelace();
-  refreshLucideIcons();
-}
-
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    void initVendorUi();
-  }, { once: true });
+  document.addEventListener('DOMContentLoaded', refreshLucideIcons, { once: true });
 } else {
-  void initVendorUi();
+  refreshLucideIcons();
 }
