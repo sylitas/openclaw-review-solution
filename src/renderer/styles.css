@@ -404,13 +404,13 @@ body {
 }
 
 .annotation-arrow {
-  stroke: #e05252;
+  stroke: #1a1a2e;
   stroke-width: 3;
   fill: none;
 }
 
 .annotation-group.is-selected .annotation-arrow {
-  stroke: #ff6b6b;
+  stroke: #333;
   stroke-width: 3.5;
 }
 

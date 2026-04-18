@@ -864,7 +864,7 @@ function buildDefs() {
 
   const polygon = document.createElementNS(SVG_NS, 'polygon');
   polygon.setAttribute('points', '0 0, 10 3.5, 0 7');
-  polygon.setAttribute('fill', '#e05252');
+  polygon.setAttribute('fill', '#1a1a2e');
 
   marker.appendChild(polygon);
   defs.appendChild(marker);
