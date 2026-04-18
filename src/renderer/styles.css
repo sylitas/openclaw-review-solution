@@ -330,9 +330,14 @@ body {
 .viewer {
   height: 100%;
   min-height: 600px;
-  padding: 16px;
+  padding: 0;
   overflow: auto;
   cursor: default;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    #1a1d27;
+  background-size: 20px 20px;
 }
 
 .viewer.is-panning {
@@ -394,6 +399,7 @@ body {
 .mermaid-iframe {
   width: 100%;
   min-height: 400px;
+  background: transparent;
 }
 
 .empty-state {
