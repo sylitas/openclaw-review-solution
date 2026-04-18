@@ -937,9 +937,18 @@ function createAnnotationElement(annotation, isDraft) {
     const point = denormalizeArtifactPoint(annotation);
     const textContent = annotation.text || '';
     const lines = textContent.split('\n');
-    const maxLineLen = Math.max(...lines.map(function (l) { return l.length; }), 1);
-    const foWidth = Math.max(120, maxLineLen * 9 + 24);
-    const foHeight = Math.max(32, lines.length * 22 + 16);
+
+    // Measure actual max line width using canvas
+    var measureCanvas = document.createElement('canvas').getContext('2d');
+    measureCanvas.font = '700 14px Inter, system-ui, sans-serif';
+    var maxPx = 0;
+    lines.forEach(function (line) {
+      var w = measureCanvas.measureText(line).width;
+      if (w > maxPx) { maxPx = w; }
+    });
+
+    var foWidth = Math.max(120, Math.ceil(maxPx) + 28);
+    var foHeight = Math.max(32, lines.length * 22 + 16);
 
     const background = document.createElementNS(SVG_NS, 'rect');
     background.setAttribute('class', 'annotation-text-bg');
