@@ -45,7 +45,6 @@ const els = {
   inspectorType: document.getElementById('inspector-type'),
   inspectorLabel: document.getElementById('inspector-label'),
   inspectorInput: document.getElementById('annotation-meta-input'),
-  inspectorClear: document.getElementById('annotation-meta-clear'),
   toolButtons: Array.from(document.querySelectorAll('[data-tool]')),
 };
 
@@ -414,10 +413,6 @@ function bindActions() {
     els.inspectorInput.addEventListener(eventName, function onInspectorInput() {
       applyInspectorValue(els.inspectorInput.value);
     });
-  });
-
-  els.inspectorClear.addEventListener('click', function onInspectorClear() {
-    applyInspectorValue('');
   });
 
   if (els.statusInfoToggle) {
@@ -1523,11 +1518,9 @@ function updateInspector() {
   if (annotation.type === 'text') {
     els.inspectorLabel.textContent = 'Text content';
     els.inspectorInput.placeholder = 'Write text content here...';
-    els.inspectorClear.textContent = 'Clear text';
   } else {
     els.inspectorLabel.textContent = 'Label / note';
     els.inspectorInput.placeholder = 'Write optional label or note here...';
-    els.inspectorClear.textContent = 'Clear metadata';
   }
 
   els.inspectorInput.value = annotation.text || '';
