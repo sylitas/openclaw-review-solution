@@ -254,77 +254,96 @@ function renderMermaid(request) {
 
   const host = document.createElement('div');
   host.className = 'mermaid-host';
-  host.innerHTML = '<div id="mermaid-root">Rendering Mermaid diagram…</div>';
 
   resetArtifactHost();
   els.artifactHost.appendChild(host);
 
-  const existingScript = document.querySelector(
-    'script[data-mermaid-runtime="true"]'
-  );
-  if (existingScript) {
-    renderMermaidSvg(host, request.inlineContent);
-    return;
-  }
-
-  const script = document.createElement('script');
-  script.src = request.mermaidScriptUrl;
-  script.dataset.mermaidRuntime = 'true';
-  script.onload = async function onLoad() {
-    renderMermaidSvg(host, request.inlineContent);
-  };
-  script.onerror = function onError() {
-    renderEmptyState('Failed to load Mermaid runtime.');
-  };
-
-  document.body.appendChild(script);
+  renderMermaidInIframe(host, request.inlineContent, request.mermaidScriptUrl);
 }
 
-async function renderMermaidSvg(host, source) {
-  try {
-    const mermaid = window.mermaid;
-    mermaid.initialize({ startOnLoad: false, securityLevel: 'strict' });
-    const renderResult = await mermaid.render(
-      `mermaid-preview-${Date.now()}`,
-      source || 'graph TD; A-->B;'
-    );
-    host.innerHTML = renderResult.svg;
+function renderMermaidInIframe(host, source, mermaidScriptUrl) {
+  var iframe = document.createElement('iframe');
+  iframe.className = 'mermaid-iframe';
+  iframe.setAttribute('sandbox', 'allow-scripts');
+  iframe.style.border = 'none';
+  iframe.style.width = '100%';
+  iframe.style.minHeight = '400px';
+  iframe.style.background = 'transparent';
 
-    const svg = host.querySelector('svg');
-    if (svg) {
-      normalizeMermaidSvg(svg);
-    }
+  var escapedSource = (source || 'graph TD; A-->B;')
+    .replace(/\\/g, '\\\\')
+    .replace(/`/g, '\\`')
+    .replace(/<\/script/gi, '<\\/script');
 
-    onArtifactReady();
-  } catch (error) {
-    renderMermaidError(error);
-  }
-}
+  var html = [
+    '<!DOCTYPE html>',
+    '<html><head>',
+    '<style>',
+    'html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }',
+    '#diagram { display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding: 24px; }',
+    '#diagram svg { max-width: 100%; }',
+    '</style>',
+    '<script src="' + mermaidScriptUrl + '"><\/script>',
+    '</head><body>',
+    '<div id="diagram">Rendering\u2026</div>',
+    '<script>',
+    'async function render() {',
+    '  try {',
+    '    mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "strict" });',
+    '    var result = await mermaid.render("mmd-" + Date.now(), `' + escapedSource + '`);',
+    '    document.getElementById("diagram").innerHTML = result.svg;',
+    '    var svg = document.querySelector("svg");',
+    '    if (svg) {',
+    '      var bbox = svg.getBBox();',
+    '      if (bbox && bbox.width && bbox.height) {',
+    '        var p = 24;',
+    '        svg.setAttribute("viewBox", (bbox.x-p)+" "+(bbox.y-p)+" "+(bbox.width+p*2)+" "+(bbox.height+p*2));',
+    '        svg.setAttribute("width", Math.ceil(bbox.width+p*2));',
+    '        svg.setAttribute("height", Math.ceil(bbox.height+p*2));',
+    '        svg.style.maxWidth = "none";',
+    '      }',
+    '      var h = svg.getAttribute("height") || svg.getBoundingClientRect().height;',
+    '      parent.postMessage({ type: "mermaid-ready", width: svg.getAttribute("width"), height: h }, "*");',
+    '    }',
+    '  } catch (e) {',
+    '    document.getElementById("diagram").textContent = "Mermaid error: " + e.message;',
+    '    parent.postMessage({ type: "mermaid-error", message: e.message }, "*");',
+    '  }',
+    '}',
+    'render();',
+    '<\/script>',
+    '</body></html>'
+  ].join('\n');
 
-function normalizeMermaidSvg(svg) {
-  try {
-    const bbox = svg.getBBox();
-    if (!bbox || !bbox.width || !bbox.height) {
+  function onMessage(event) {
+    if (!event.data || !event.data.type) {
       return;
     }
 
-    const padding = 24;
-    const x = Math.floor(bbox.x - padding);
-    const y = Math.floor(bbox.y - padding);
-    const width = Math.ceil(bbox.width + padding * 2);
-    const height = Math.ceil(bbox.height + padding * 2);
+    if (event.data.type === 'mermaid-ready') {
+      var h = parseInt(event.data.height, 10);
+      if (h && h > 0) {
+        iframe.style.height = (h + 48) + 'px';
+      }
 
-    svg.setAttribute('viewBox', `${x} ${y} ${width} ${height}`);
-    svg.setAttribute('width', String(width));
-    svg.setAttribute('height', String(height));
-    svg.style.maxWidth = 'none';
-    svg.style.width = `${width}px`;
-    svg.style.height = `${height}px`;
-    svg.style.display = 'block';
-  } catch {
-    // Ignore SVG bbox normalization errors and keep Mermaid's default output.
+      window.removeEventListener('message', onMessage);
+      onArtifactReady();
+      return;
+    }
+
+    if (event.data.type === 'mermaid-error') {
+      window.removeEventListener('message', onMessage);
+      renderMermaidError(new Error(event.data.message || 'Unknown error'));
+    }
   }
+
+  window.addEventListener('message', onMessage);
+
+  iframe.srcdoc = html;
+  host.innerHTML = '';
+  host.appendChild(iframe);
 }
+
 
 function renderMermaidError(error) {
   resetArtifactHost();
