@@ -3,8 +3,8 @@
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 8;
-const ZOOM_STEP = 0.1;
-const WHEEL_ZOOM_STEP = 0.01;
+const ZOOM_STEP = 0.25;
+const WHEEL_ZOOM_STEP = 0.03;
 
 const els = {
   title: document.getElementById('title'),
