@@ -10,6 +10,10 @@ const els = {
   title: document.getElementById('title'),
   prompt: document.getElementById('prompt'),
   artifactType: document.getElementById('artifact-type'),
+  statusInfoToggle: document.getElementById('status-info-toggle'),
+  statusPopover: document.getElementById('status-popover'),
+  helpInfoToggle: document.getElementById('help-info-toggle'),
+  helpPopover: document.getElementById('help-popover'),
   artifactHost: document.getElementById('artifact-host'),
   viewer: document.getElementById('viewer'),
   viewerStage: document.getElementById('viewer-stage'),
@@ -66,6 +70,8 @@ const state = {
   uiRunning: false,
   daemonError: '',
   isSubmitting: false,
+  statusPopoverOpen: false,
+  helpPopoverOpen: false,
 };
 
 async function boot() {
@@ -87,6 +93,7 @@ async function boot() {
     window.addEventListener('resize', onWindowResize);
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
+    document.addEventListener('pointerdown', onDocumentPointerDown);
     actionsBound = true;
   }
 
@@ -114,13 +121,69 @@ function resetSessionState() {
   state.spacePan = false;
   state.zoom = 1;
   state.isSubmitting = false;
+  state.statusPopoverOpen = false;
+  state.helpPopoverOpen = false;
   els.message.value = '';
+  updateTopbarPopovers();
 }
 
 function refreshVendorUi() {
   if (typeof window.refreshLucideIcons === 'function') {
     window.refreshLucideIcons();
   }
+}
+
+function updateTopbarPopovers() {
+  if (els.statusPopover) {
+    els.statusPopover.classList.toggle('hidden', !state.statusPopoverOpen);
+  }
+
+  if (els.helpPopover) {
+    els.helpPopover.classList.toggle('hidden', !state.helpPopoverOpen);
+  }
+
+  if (els.statusInfoToggle) {
+    els.statusInfoToggle.setAttribute(
+      'aria-expanded',
+      state.statusPopoverOpen ? 'true' : 'false'
+    );
+  }
+
+  if (els.helpInfoToggle) {
+    els.helpInfoToggle.setAttribute(
+      'aria-expanded',
+      state.helpPopoverOpen ? 'true' : 'false'
+    );
+  }
+}
+
+function closeTopbarPopovers() {
+  if (!state.statusPopoverOpen && !state.helpPopoverOpen) {
+    return;
+  }
+
+  state.statusPopoverOpen = false;
+  state.helpPopoverOpen = false;
+  updateTopbarPopovers();
+}
+
+function onDocumentPointerDown(event) {
+  if (!state.statusPopoverOpen && !state.helpPopoverOpen) {
+    return;
+  }
+
+  const target = event.target;
+
+  if (
+    (els.statusInfoToggle && els.statusInfoToggle.contains(target)) ||
+    (els.statusPopover && els.statusPopover.contains(target)) ||
+    (els.helpInfoToggle && els.helpInfoToggle.contains(target)) ||
+    (els.helpPopover && els.helpPopover.contains(target))
+  ) {
+    return;
+  }
+
+  closeTopbarPopovers();
 }
 
 function renderRequest(request) {
@@ -356,6 +419,30 @@ function bindActions() {
   els.inspectorClear.addEventListener('click', function onInspectorClear() {
     applyInspectorValue('');
   });
+
+  if (els.statusInfoToggle) {
+    els.statusInfoToggle.addEventListener('click', function onStatusInfoToggle(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      state.statusPopoverOpen = !state.statusPopoverOpen;
+      if (state.statusPopoverOpen) {
+        state.helpPopoverOpen = false;
+      }
+      updateTopbarPopovers();
+    });
+  }
+
+  if (els.helpInfoToggle) {
+    els.helpInfoToggle.addEventListener('click', function onHelpInfoToggle(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      state.helpPopoverOpen = !state.helpPopoverOpen;
+      if (state.helpPopoverOpen) {
+        state.statusPopoverOpen = false;
+      }
+      updateTopbarPopovers();
+    });
+  }
 
   els.toolButtons.forEach((button) => {
     button.addEventListener('click', function onToolSelect() {
@@ -1568,6 +1655,11 @@ function onKeyDown(event) {
   }
 
   if (event.key === 'Escape') {
+    if (state.statusPopoverOpen || state.helpPopoverOpen) {
+      closeTopbarPopovers();
+      return;
+    }
+
     state.draft = null;
     state.dragging = null;
     state.panning = null;

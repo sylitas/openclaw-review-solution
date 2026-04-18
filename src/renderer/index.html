@@ -19,9 +19,18 @@
         </div>
         <div class="topbar-actions">
           <sl-badge pill id="artifact-type" variant="neutral">UNKNOWN</sl-badge>
-          <sl-dropdown placement="bottom-end" distance="10" hoist>
-            <sl-button id="status-info-toggle" class="info-btn" slot="trigger" circle size="small" aria-label="Show review status">i</sl-button>
-            <sl-card id="status-popover" class="status-popover-card">
+
+          <div class="popover-group">
+            <button
+              id="status-info-toggle"
+              class="icon-trigger-btn"
+              type="button"
+              aria-label="Show review status"
+              aria-expanded="false"
+            >
+              i
+            </button>
+            <sl-card id="status-popover" class="status-popover-card hidden">
               <div class="status-grid">
                 <div id="daemon-connection-state" class="status-pill status-pill-neutral">Daemon: checking…</div>
                 <div id="session-mode-state" class="status-pill status-pill-neutral">Session: booting</div>
@@ -30,12 +39,19 @@
               <div id="request-state">Request: none</div>
               <div id="daemon-message" class="daemon-message">Checking daemon status…</div>
             </sl-card>
-          </sl-dropdown>
-          <sl-dropdown placement="bottom-end" distance="10" hoist>
-            <sl-button id="help-info-toggle" class="info-btn" slot="trigger" circle size="small" aria-label="Show app help">
+          </div>
+
+          <div class="popover-group">
+            <button
+              id="help-info-toggle"
+              class="icon-trigger-btn"
+              type="button"
+              aria-label="Show app help"
+              aria-expanded="false"
+            >
               <i data-lucide="book-open" aria-hidden="true"></i>
-            </sl-button>
-            <sl-card class="status-popover-card help-popover-card">
+            </button>
+            <sl-card id="help-popover" class="status-popover-card help-popover-card hidden">
               <div id="selection-state">Selected: none</div>
               <div id="annotation-count">Annotations: 0</div>
               <div id="active-tool">Tool: rect</div>
@@ -46,7 +62,7 @@
               <div>Zoom: buttons, or hold Cmd/Ctrl and use the mouse wheel to zoom around cursor.</div>
               <div>Tip: selected rects/arrows expose handles for resize / endpoint editing.</div>
             </sl-card>
-          </sl-dropdown>
+          </div>
         </div>
       </header>
 
