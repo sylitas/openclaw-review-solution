@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en" class="sl-theme-dark">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OpenClaw Review Solution</title>
-    <link rel="stylesheet" href="../../node_modules/@shoelace-style/shoelace/dist/themes/dark.css" />
+    <link rel="stylesheet" href="../../node_modules/@picocss/pico/css/pico.blue.min.css" />
     <link rel="stylesheet" href="./styles.css" />
     <script src="../../node_modules/lucide/dist/umd/lucide.js"></script>
   </head>
@@ -17,7 +17,7 @@
           <p id="prompt" class="prompt"></p>
         </div>
         <div class="topbar-actions">
-          <sl-badge pill id="artifact-type" variant="neutral">UNKNOWN</sl-badge>
+          <span id="artifact-type" class="badge">UNKNOWN</span>
 
           <div class="popover-group">
             <button
@@ -29,7 +29,7 @@
             >
               i
             </button>
-            <sl-card id="status-popover" class="status-popover-card hidden">
+            <div id="status-popover" class="popover-card hidden">
               <div class="popover-section">
                 <div class="popover-section-title">Connection</div>
                 <div class="status-grid">
@@ -47,7 +47,7 @@
               <div class="popover-section">
                 <div id="daemon-message" class="daemon-message">Checking daemon status…</div>
               </div>
-            </sl-card>
+            </div>
           </div>
 
           <div class="popover-group">
@@ -60,7 +60,7 @@
             >
               <i data-lucide="book-open" aria-hidden="true"></i>
             </button>
-            <sl-card id="help-popover" class="status-popover-card help-popover-card hidden">
+            <div id="help-popover" class="popover-card help-popover-card hidden">
               <div class="popover-section">
                 <div class="popover-section-title">Canvas</div>
                 <div class="popover-row" id="selection-state">Selected: none</div>
@@ -85,7 +85,7 @@
                 <div class="popover-row">Hold <kbd>Cmd</kbd> + scroll to zoom around cursor.</div>
                 <div class="popover-row">Selected rects/arrows expose handles for resize and endpoint editing.</div>
               </div>
-            </sl-card>
+            </div>
           </div>
         </div>
       </header>
@@ -144,34 +144,32 @@
               <div id="inspector-type" class="inspector-type"></div>
               <label class="field field-grow">
                 <span id="inspector-label">Label / note</span>
-                <sl-textarea
+                <textarea
                   id="annotation-meta-input"
                   rows="5"
-                  resize="auto"
                   placeholder="Write note or text here..."
-                ></sl-textarea>
+                ></textarea>
               </label>
-              <sl-button id="annotation-meta-clear" variant="default" size="small">
+              <button id="annotation-meta-clear" class="btn btn-secondary btn-sm">
                 Clear metadata
-              </sl-button>
+              </button>
             </div>
           </section>
 
           <div class="review-footer">
             <label class="field">
               <span>Review note</span>
-              <sl-textarea
+              <textarea
                 id="message"
                 rows="6"
-                resize="auto"
                 placeholder="Write your decision or change request here..."
-              ></sl-textarea>
+              ></textarea>
             </label>
 
             <div class="actions">
-              <sl-button id="approve" class="action-btn" variant="success" size="large">Approve</sl-button>
-              <sl-button id="changes" class="action-btn" variant="primary" size="large">Request changes</sl-button>
-              <sl-button id="cancel" class="action-btn" variant="default" size="large">Cancel</sl-button>
+              <button id="approve" class="btn btn-success">Approve</button>
+              <button id="changes" class="btn btn-primary">Request changes</button>
+              <button id="cancel" class="btn btn-secondary">Cancel</button>
             </div>
           </div>
 
@@ -179,7 +177,7 @@
       </main>
     </div>
 
-    <script type="module" src="./vendor.js"></script>
+    <script src="./vendor.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

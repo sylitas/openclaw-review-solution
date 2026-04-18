@@ -410,7 +410,7 @@ function bindActions() {
     setZoom(1);
   });
 
-  ['input', 'sl-input'].forEach((eventName) => {
+  ['input', 'change'].forEach((eventName) => {
     els.inspectorInput.addEventListener(eventName, function onInspectorInput() {
       applyInspectorValue(els.inspectorInput.value);
     });
@@ -1600,9 +1600,7 @@ function onArtifactReady() {
 function onKeyDown(event) {
   const isInputFocused =
     document.activeElement === els.message ||
-    document.activeElement === els.inspectorInput ||
-    els.message.matches(':focus-within') ||
-    els.inspectorInput.matches(':focus-within');
+    document.activeElement === els.inspectorInput;
 
   if (
     (event.metaKey || event.ctrlKey) &&
@@ -2146,12 +2144,7 @@ function startSessionPolling() {
 }
 
 function waitForShoelace() {
-  var tags = ['sl-button', 'sl-textarea', 'sl-badge', 'sl-card'];
-  return Promise.all(
-    tags.map(function (tag) {
-      return customElements.whenDefined(tag);
-    })
-  );
+  return Promise.resolve();
 }
 
 waitForShoelace().then(boot);

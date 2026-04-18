@@ -1,11 +1,4 @@
-import { setBasePath } from '../../node_modules/@shoelace-style/shoelace/dist/utilities/base-path.js';
-
-setBasePath('../../node_modules/@shoelace-style/shoelace/dist');
-
-import '../../node_modules/@shoelace-style/shoelace/dist/components/badge/badge.js';
-import '../../node_modules/@shoelace-style/shoelace/dist/components/button/button.js';
-import '../../node_modules/@shoelace-style/shoelace/dist/components/card/card.js';
-import '../../node_modules/@shoelace-style/shoelace/dist/components/textarea/textarea.js';
+'use strict';
 
 function refreshLucideIcons() {
   if (!window.lucide || typeof window.lucide.createIcons !== 'function') {
