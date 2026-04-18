@@ -46,22 +46,53 @@ async function handleOpen(args) {
   const sourcePath = args[0];
 
   if (!sourcePath) {
-    console.error('Missing image path.');
+    console.error('Missing file path.');
     process.exit(2);
   }
 
   const flags = parseFlags(args.slice(1));
+  const resolved = path.resolve(process.cwd(), sourcePath);
+  const ext = path.extname(resolved).toLowerCase();
+
+  const artifactType = detectArtifactType(ext);
+
+  if (artifactType === 'mermaid' || artifactType === 'html') {
+    const inlineContent = require('fs').readFileSync(resolved, 'utf8');
+    const request = {
+      id: createRequestId(),
+      artifactType,
+      title: flags.title || path.basename(sourcePath),
+      prompt: flags.prompt || `Review this ${artifactType} artifact.`,
+      inlineContent,
+      createdAt: new Date().toISOString(),
+    };
+
+    await submitAndAwait(request);
+    return;
+  }
 
   const request = {
     id: createRequestId(),
     artifactType: 'image',
     title: flags.title || path.basename(sourcePath),
     prompt: flags.prompt || 'Review this image.',
-    sourcePath: path.resolve(process.cwd(), sourcePath),
+    sourcePath: resolved,
     createdAt: new Date().toISOString(),
   };
 
   await submitAndAwait(request);
+}
+
+function detectArtifactType(ext) {
+  if (ext === '.mmd' || ext === '.mermaid') {
+    return 'mermaid';
+  }
+
+  if (ext === '.html' || ext === '.htm') {
+    return 'html';
+  }
+
+  return 'image';
 }
 
 async function handleRender(args) {
