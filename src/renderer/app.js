@@ -98,6 +98,7 @@ async function boot() {
   updateStatus();
   updateInspector();
   renderAnnotations();
+  refreshVendorUi();
   startSessionPolling();
 }
 
@@ -116,12 +117,19 @@ function resetSessionState() {
   els.message.value = '';
 }
 
+function refreshVendorUi() {
+  if (typeof window.refreshLucideIcons === 'function') {
+    window.refreshLucideIcons();
+  }
+}
+
 function renderRequest(request) {
   if (!request) {
     els.title.textContent = 'Waiting for review request…';
     els.prompt.textContent = 'The review window is idle. Submit a request from the CLI and it will appear here automatically.';
     els.artifactType.textContent = 'IDLE';
     renderEmptyState('No active review request right now.');
+    refreshVendorUi();
     return;
   }
 
@@ -147,6 +155,7 @@ function renderRequest(request) {
   }
 
   renderEmptyState(`Unsupported artifact type: ${request.artifactType}`);
+  refreshVendorUi();
 }
 
 function renderImage(request) {
@@ -276,6 +285,7 @@ function renderEmptyState(message) {
   box.textContent = message;
 
   els.artifactHost.appendChild(box);
+  refreshVendorUi();
 }
 
 function resetArtifactHost() {
@@ -1497,6 +1507,7 @@ function onArtifactReady() {
   syncArtifactMetrics();
   updateStatus();
   renderAnnotations();
+  refreshVendorUi();
 }
 
 function onKeyDown(event) {
