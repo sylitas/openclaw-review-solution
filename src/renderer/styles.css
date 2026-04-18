@@ -379,6 +379,12 @@ body {
   cursor: crosshair;
 }
 
+/* ── Mermaid diagram isolation (prevent Pico from styling SVG internals) ── */
+
+.mermaid-host svg * {
+  all: revert;
+}
+
 .mermaid-host {
   width: 100%;
   min-height: 200px;
@@ -509,63 +515,58 @@ textarea:focus {
 /* ── Action buttons ── */
 
 .actions {
-  display: grid;
-  grid-template-columns: 1fr;
+  display: flex;
   gap: 12px;
+  justify-content: center;
 }
 
-.btn {
-  appearance: none;
-  border: 0;
+.action-icon-btn {
+  width: 48px;
+  height: 48px;
   border-radius: 12px;
-  padding: 14px 16px;
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-  text-align: center;
-  width: 100%;
 }
 
-.btn:disabled {
+.action-icon-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.action-icon-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
-.btn-success {
+.action-success {
   background: var(--success);
+  border-color: var(--success);
   color: white;
-  border: 1px solid var(--success);
 }
 
-.btn-success:hover:not(:disabled) {
+.action-success:hover:not(:disabled) {
   background: #27a561;
+  border-color: #27a561;
 }
 
-.btn-primary {
+.action-primary {
   background: var(--accent);
+  border-color: var(--accent);
   color: white;
-  border: 1px solid var(--accent);
 }
 
-.btn-primary:hover:not(:disabled) {
+.action-primary:hover:not(:disabled) {
   background: #4b78e0;
+  border-color: #4b78e0;
 }
 
-.btn-secondary {
+.action-secondary {
   background: transparent;
+  border-color: var(--border);
   color: var(--muted);
-  border: 1px solid var(--border);
 }
 
-.btn-secondary:hover:not(:disabled) {
-  border-color: #3a4053;
-  color: var(--text);
-}
-
-.btn-sm {
-  padding: 8px 12px;
-  font-size: 13px;
-  border-radius: 8px;
+.action-secondary:hover:not(:disabled) {
+  border-color: #6b2b2b;
+  color: #ffd2d2;
 }
 
 /* ── Lucide icon base ── */
