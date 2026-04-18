@@ -133,9 +133,13 @@ sl-card.status-popover-card {
   position: absolute;
   top: calc(100% + 12px);
   right: 0;
+  display: block;
   width: 360px;
   max-width: min(360px, calc(100vw - 48px));
   z-index: 30;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: #10131b;
 }
 
 sl-card.help-popover-card {
@@ -588,7 +592,10 @@ sl-textarea {
 }
 
 sl-button.action-btn {
+  display: block;
   width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 sl-button.action-btn::part(base) {
@@ -598,6 +605,24 @@ sl-button.action-btn::part(base) {
   font-weight: 700;
   min-height: 46px;
   pointer-events: auto;
+}
+
+#approve {
+  --sl-color-success-600: #2fbf71;
+  --sl-color-success-500: #42cf82;
+  --sl-color-success-700: #27a561;
+}
+
+#changes {
+  --sl-color-primary-600: #5b8cff;
+  --sl-color-primary-500: #75a0ff;
+  --sl-color-primary-700: #4b78e0;
+}
+
+#cancel::part(base) {
+  border-color: var(--border);
+  background: #10131b;
+  color: var(--text);
 }
 
 .hint {

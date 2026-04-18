@@ -1,4 +1,7 @@
-'use strict';
+import { setBasePath } from '../../node_modules/@shoelace-style/shoelace/dist/utilities/base-path.js';
+import '../../node_modules/@shoelace-style/shoelace/dist/shoelace-autoloader.js';
+
+setBasePath('../../node_modules/@shoelace-style/shoelace/dist');
 
 function refreshLucideIcons() {
   if (!window.lucide || typeof window.lucide.createIcons !== 'function') {

@@ -30,7 +30,7 @@ module.exports = [
     files: ['src/renderer/vendor.js'],
     languageOptions: {
       ecmaVersion: 'latest',
-      sourceType: 'script',
+      sourceType: 'module',
       globals: {
         window: 'readonly',
         document: 'readonly'
