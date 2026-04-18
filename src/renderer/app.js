@@ -2036,15 +2036,6 @@ function getMinimumNormalizedSize() {
   };
 }
 
-function applyInspectorValue(value) {
-  const annotation = getSelectedAnnotation();
-  if (!annotation) {
-    return;
-  }
-
-  annotation.text = value;
-  renderAnnotations();
-}
 
 function measureLabelWidth(textValue) {
   return Math.max(120, String(textValue || '').length * 8 + 16);
