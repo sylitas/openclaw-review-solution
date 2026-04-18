@@ -11,5 +11,8 @@ contextBridge.exposeInMainWorld('reviewApp', {
   },
   submitResult(payload) {
     return ipcRenderer.invoke('review:submit-result', payload);
+  },
+  closeWindow() {
+    return ipcRenderer.invoke('review:close-window');
   }
 });

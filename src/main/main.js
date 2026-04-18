@@ -102,6 +102,10 @@ if (!hasLock) {
     };
   });
 
+  ipcMain.handle('review:close-window', async () => {
+    app.quit();
+  });
+
   app.whenReady().then(() => {
     createWindow();
 

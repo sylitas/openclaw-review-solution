@@ -1093,7 +1093,7 @@ async function submit(status) {
   try {
     const exportPayload = await buildExportPayload();
 
-    await window.reviewApp.submitResult({
+    const result = await window.reviewApp.submitResult({
       status,
       message: els.message.value,
       annotations: state.annotations,
@@ -1101,7 +1101,11 @@ async function submit(status) {
       exportPayload,
     });
 
-    window.location.reload();
+    if (result && result.nextRequest && result.nextRequest.id) {
+      window.location.reload();
+    } else {
+      window.reviewApp.closeWindow();
+    }
   } catch (error) {
     state.isSubmitting = false;
     state.daemonConnected = false;
