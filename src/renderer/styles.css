@@ -254,7 +254,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  padding: 16px 16px 0;
+  padding: 16px;
   align-items: center;
 }
 
