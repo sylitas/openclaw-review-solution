@@ -1011,25 +1011,34 @@ function appendRectInnerLabel(group, textValue, box) {
   }
 
   const padding = 10;
-  const lineHeight = 18;
-  const labelWidth = Math.max(80, Math.min(box.width - padding * 2, box.width - 16));
+  const innerW = Math.max(40, box.width - padding * 2);
+  const innerH = Math.max(24, box.height - padding * 2);
+
   const background = document.createElementNS(SVG_NS, 'rect');
   background.setAttribute('class', 'annotation-label-bg');
   background.setAttribute('x', box.x + padding);
   background.setAttribute('y', box.y + padding);
   background.setAttribute('rx', '8');
   background.setAttribute('ry', '8');
-  background.setAttribute('width', Math.max(60, labelWidth));
-  background.setAttribute('height', '26');
+  background.setAttribute('width', innerW);
+  background.setAttribute('height', innerH);
 
-  const label = document.createElementNS(SVG_NS, 'text');
-  label.setAttribute('class', 'annotation-label-text');
-  label.setAttribute('x', box.x + padding + 8);
-  label.setAttribute('y', box.y + padding + lineHeight);
-  label.textContent = text;
+  const fo = document.createElementNS(SVG_NS, 'foreignObject');
+  fo.setAttribute('x', box.x + padding);
+  fo.setAttribute('y', box.y + padding);
+  fo.setAttribute('width', innerW);
+  fo.setAttribute('height', innerH);
+
+  const div = document.createElement('div');
+  div.className = 'annotation-text-fo';
+  div.style.maxWidth = innerW + 'px';
+  div.style.maxHeight = innerH + 'px';
+  div.style.overflow = 'hidden';
+  div.textContent = text;
+  fo.appendChild(div);
 
   group.appendChild(background);
-  group.appendChild(label);
+  group.appendChild(fo);
 }
 
 function appendRectHandles(group, annotation) {
