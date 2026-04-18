@@ -264,7 +264,7 @@ function renderMermaid(request) {
 function renderMermaidInIframe(host, source, mermaidScriptUrl) {
   var iframe = document.createElement('iframe');
   iframe.className = 'mermaid-iframe';
-  iframe.setAttribute('sandbox', 'allow-scripts');
+  iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
   iframe.style.border = 'none';
   iframe.style.width = '100%';
   iframe.style.minHeight = '400px';
