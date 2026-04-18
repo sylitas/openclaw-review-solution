@@ -289,7 +289,7 @@ function renderMermaidInIframe(host, source, mermaidScriptUrl) {
     '<script>',
     'async function render() {',
     '  try {',
-    '    mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "strict" });',
+    '    mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "strict" });',
     '    var result = await mermaid.render("mmd-" + Date.now(), `' + escapedSource + '`);',
     '    document.getElementById("diagram").innerHTML = result.svg;',
     '    var svg = document.querySelector("svg");',
@@ -1764,7 +1764,8 @@ function setZoom(nextZoom, options) {
 }
 
 function applyZoom(initial) {
-  els.viewerStage.style.zoom = String(state.zoom);
+  els.viewerStage.style.transform = 'scale(' + state.zoom + ')';
+  els.viewerStage.style.transformOrigin = '0 0';
   if (!initial) {
     updateStatus();
   }
