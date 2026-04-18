@@ -1804,16 +1804,19 @@ function fitZoomToArtifact() {
 }
 
 function onViewerWheel(event) {
-  if (!(event.metaKey || event.ctrlKey)) {
+  // Pinch-to-zoom on trackpad (macOS sends ctrlKey+wheel for pinch)
+  // Also Cmd+scroll for mouse zoom
+  if (event.metaKey || event.ctrlKey) {
+    event.preventDefault();
+    const direction = event.deltaY > 0 ? -WHEEL_ZOOM_STEP : WHEEL_ZOOM_STEP;
+    setZoom(state.zoom + direction, {
+      anchorClientX: event.clientX,
+      anchorClientY: event.clientY,
+    });
     return;
   }
 
-  event.preventDefault();
-  const direction = event.deltaY > 0 ? -WHEEL_ZOOM_STEP : WHEEL_ZOOM_STEP;
-  setZoom(state.zoom + direction, {
-    anchorClientX: event.clientX,
-    anchorClientY: event.clientY,
-  });
+  // 2-finger scroll = native scroll/pan (handled by overflow:auto)
 }
 
 function syncStageGeometry() {
