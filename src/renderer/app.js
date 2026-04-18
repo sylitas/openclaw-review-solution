@@ -886,7 +886,17 @@ function createAnnotationElement(annotation, isDraft) {
   }
 
   if (annotation.type === 'rect') {
-    const box = denormalizeRect(annotation);
+    var box = denormalizeRect(annotation);
+
+    // Auto-expand rect to fit text content
+    if (annotation.text) {
+      var measured = measureTextBlock(annotation.text, box.width);
+      var minW = measured.width + 20;
+      var minH = measured.height + 20;
+      if (minW > box.width) { box.width = minW; }
+      if (minH > box.height) { box.height = minH; }
+    }
+
     const rect = document.createElementNS(SVG_NS, 'rect');
     rect.setAttribute('class', 'annotation-rect');
     rect.setAttribute('x', box.x);
@@ -2067,6 +2077,39 @@ function getMinimumNormalizedSize() {
 
 function measureLabelWidth(textValue) {
   return Math.max(120, String(textValue || '').length * 8 + 16);
+}
+
+function measureTextBlock(textValue, maxWidth) {
+  var ctx = document.createElement('canvas').getContext('2d');
+  ctx.font = '700 14px Inter, system-ui, sans-serif';
+  var text = String(textValue || '');
+  var words = text.split(/\s+/);
+  var lines = [];
+  var currentLine = '';
+  var lineWidth = Math.max(maxWidth - 20, 80);
+
+  words.forEach(function (word) {
+    var testLine = currentLine ? currentLine + ' ' + word : word;
+    var w = ctx.measureText(testLine).width;
+    if (w > lineWidth && currentLine) {
+      lines.push(currentLine);
+      currentLine = word;
+    } else {
+      currentLine = testLine;
+    }
+  });
+  if (currentLine) { lines.push(currentLine); }
+
+  var maxPx = 0;
+  lines.forEach(function (line) {
+    var w = ctx.measureText(line).width;
+    if (w > maxPx) { maxPx = w; }
+  });
+
+  return {
+    width: Math.ceil(maxPx) + 24,
+    height: lines.length * 22 + 12,
+  };
 }
 
 function getSceneWidth() {
