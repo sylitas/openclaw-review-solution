@@ -1816,7 +1816,10 @@ function onViewerWheel(event) {
     return;
   }
 
-  // 2-finger scroll = native scroll/pan (handled by overflow:auto)
+  // 2-finger scroll: manual diagonal pan (bypass macOS axis locking)
+  event.preventDefault();
+  els.viewer.scrollLeft += event.deltaX;
+  els.viewer.scrollTop += event.deltaY;
 }
 
 function syncStageGeometry() {
