@@ -4,7 +4,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 function createUiLauncher({ projectRoot, onLaunchError, onWindowClosed }) {
-  const electronBin = path.join(projectRoot, 'node_modules', '.bin', 'electron');
+  const electronCli = path.join(projectRoot, 'node_modules', 'electron', 'cli.js');
   let uiProcess = null;
 
   function ensureWindow() {
@@ -12,7 +12,7 @@ function createUiLauncher({ projectRoot, onLaunchError, onWindowClosed }) {
       return;
     }
 
-    uiProcess = spawn(electronBin, ['.'], {
+    uiProcess = spawn(process.execPath, [electronCli, '.'], {
       cwd: projectRoot,
       stdio: 'ignore',
     });

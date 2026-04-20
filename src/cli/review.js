@@ -8,7 +8,7 @@ const { requestJson } = require('../shared/http');
 const { REQUEST_POLL_INTERVAL_MS } = require('../shared/constants');
 
 const projectRoot = path.resolve(__dirname, '..', '..');
-const pm2Bin = path.join(projectRoot, 'node_modules', '.bin', 'pm2');
+const pm2Cli = path.join(projectRoot, 'node_modules', 'pm2', 'bin', 'pm2');
 
 async function main() {
   const args = process.argv.slice(2);
@@ -171,7 +171,7 @@ function shouldAttemptDaemonStart(error) {
 
 function startDaemonViaPm2() {
   return new Promise((resolve, reject) => {
-    const child = spawn(pm2Bin, ['start', 'ecosystem.config.cjs', '--only', 'openclaw-reviewd'], {
+    const child = spawn(process.execPath, [pm2Cli, 'start', 'ecosystem.config.cjs', '--only', 'openclaw-reviewd'], {
       cwd: projectRoot,
       stdio: 'ignore',
     });
