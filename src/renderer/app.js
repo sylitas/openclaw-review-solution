@@ -586,7 +586,11 @@ function bindActions() {
   }
 
   if (els.inlineEditorCancel) {
-  if (els.inlineEditorCancel) {
+    els.inlineEditorCancel.addEventListener('click', function onInlineEditorCancel() {
+      closeInlineEditor();
+    });
+  }
+
   if (els.inlineEditorBackdrop) {
     els.inlineEditorBackdrop.addEventListener('click', function onBackdropClick() {
       closeInlineEditor();
@@ -595,10 +599,6 @@ function bindActions() {
 
   if (els.inlineEditorClose) {
     els.inlineEditorClose.addEventListener('click', function onCloseClick() {
-      closeInlineEditor();
-    });
-  }
-    els.inlineEditorCancel.addEventListener('click', function onInlineEditorCancel() {
       closeInlineEditor();
     });
   }
@@ -1436,7 +1436,6 @@ function openInlineEditor(annotationId) {
   }
 
   els.inlineEditorInput.value = state.inlineEditor.value;
-  // Show slide-up editor (ignore absolute positioning used previously)
   els.inlineEditor.classList.remove('hidden');
 
   window.requestAnimationFrame(() => {
