@@ -59,6 +59,8 @@ function captureElements() {
   els.currentArtifactTitle = document.getElementById('current-artifact-title');
   els.currentArtifactMeta = document.getElementById('current-artifact-meta');
   els.inlineEditor = document.getElementById('inline-editor');
+  els.inlineEditorBackdrop = document.getElementById('inline-editor-backdrop');
+  els.inlineEditorClose = document.getElementById('inline-editor-close');
   els.inlineEditorTitle = document.getElementById('inline-editor-title');
   els.inlineEditorInput = document.getElementById('inline-editor-input');
   els.inlineEditorSave = document.getElementById('inline-editor-save');
