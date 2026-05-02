@@ -5,6 +5,7 @@ import {
   Check,
   ChevronDown,
   Copy,
+  FileCode2,
   Info,
   Minus,
   MousePointer2,
@@ -284,33 +285,70 @@ export function AppShell() {
             <div id="viewer-stage" className="viewer-stage">
               <div id="artifact-host" className="artifact-host" />
               <svg id="annotation-layer" className="annotation-layer" />
+              <div id="inline-editor" className="inline-editor hidden">
+                <div className="inline-editor-card">
+                  <div id="inline-editor-title" className="inline-editor-title">Edit note</div>
+                  <textarea
+                    id="inline-editor-input"
+                    rows="4"
+                    placeholder="Write note directly on design..."
+                  />
+                  <div className="inline-editor-actions">
+                    <button id="inline-editor-save" className="tool-btn" type="button">Save</button>
+                    <button id="inline-editor-cancel" className="tool-btn" type="button">Cancel</button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
         <aside className="review-panel">
-          <section
-            id="annotation-inspector"
-            className="inspector-card is-empty"
-          >
-            <div className="inspector-title">Selected annotation</div>
-            <div id="inspector-empty" className="inspector-empty">
-              Select an annotation to edit its metadata here.
-            </div>
-            <div id="inspector-content" className="inspector-content hidden">
-              <div id="inspector-type" className="inspector-type" />
-              <label className="field field-grow">
-                <span id="inspector-label">Label / note</span>
-                <textarea
-                  id="annotation-meta-input"
-                  rows="5"
-                  placeholder="Write note or text here..."
-                />
-              </label>
+          <section id="generated-files" className="inspector-card generated-files-card">
+            <div className="inspector-title">Current artifact</div>
+            <div className="current-artifact-card">
+              <div className="current-artifact-title-row">
+                <FileCode2 aria-hidden="true" />
+                <div className="current-artifact-copy">
+                  <div id="current-artifact-title" className="current-artifact-title">No active artifact</div>
+                  <div id="current-artifact-meta" className="current-artifact-meta">Waiting for request…</div>
+                </div>
+              </div>
+
+              <div className="artifact-dropdown">
+                <button
+                  id="artifact-picker-toggle"
+                  className="tool-btn artifact-picker-toggle"
+                  type="button"
+                  aria-label="Open artifact list"
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                >
+                  <span className="artifact-picker-label">
+                    <span className="artifact-picker-browse-label">Browse artifacts</span>
+                    <span id="artifact-picker-current">No artifact selected</span>
+                  </span>
+                  <ChevronDown className="draw-tool-chevron" aria-hidden="true" />
+                </button>
+
+                <div
+                  id="artifact-picker-menu"
+                  className="popover-card artifact-picker-menu hidden"
+                  role="menu"
+                  aria-label="Artifact files"
+                >
+                  <div id="generated-files-empty" className="inspector-empty artifact-picker-empty">
+                    No generated files yet.
+                  </div>
+                  <div id="generated-files-list" className="generated-files-list hidden" />
+                </div>
+              </div>
             </div>
           </section>
 
-          <div className="review-footer">
+
+          <section className="inspector-card review-actions-card">
+            <div className="inspector-title">Review action</div>
             <label className="field">
               <span>Review note</span>
               <textarea
@@ -346,7 +384,7 @@ export function AppShell() {
                 <X aria-hidden="true" />
               </button>
             </div>
-          </div>
+          </section>
         </aside>
       </main>
     </div>

@@ -1,8 +1,9 @@
 'use strict';
 
 const path = require('path');
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const { requestJson } = require('../shared/http');
+const { listGeneratedRequests } = require('../shared/artifact-registry');
 const { debugLog } = require('../shared/debug-log');
 
 let mainWindow = null;
@@ -180,6 +181,24 @@ if (!hasLock) {
     }
 
     return resultPayload;
+  });
+
+  ipcMain.handle('review:list-generated-files', async () => {
+    debugLog('ipc', 'review:list-generated-files');
+    return listGeneratedRequests();
+  });
+
+  ipcMain.handle('review:open-generated-file', async (_event, filePath) => {
+    debugLog('ipc', 'review:open-generated-file', { filePath });
+    if (!filePath) {
+      throw new Error('filePath is required');
+    }
+
+    const result = await shell.openPath(filePath);
+    return {
+      ok: result === '',
+      error: result || null,
+    };
   });
 
   ipcMain.handle('review:close-window', async () => {

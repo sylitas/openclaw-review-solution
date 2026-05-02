@@ -50,12 +50,19 @@ function captureElements() {
   els.queueState = document.getElementById('queue-state');
   els.requestState = document.getElementById('request-state');
   els.daemonMessage = document.getElementById('daemon-message');
-  els.inspector = document.getElementById('annotation-inspector');
-  els.inspectorEmpty = document.getElementById('inspector-empty');
-  els.inspectorContent = document.getElementById('inspector-content');
-  els.inspectorType = document.getElementById('inspector-type');
-  els.inspectorLabel = document.getElementById('inspector-label');
-  els.inspectorInput = document.getElementById('annotation-meta-input');
+  els.generatedFiles = document.getElementById('generated-files');
+  els.generatedFilesEmpty = document.getElementById('generated-files-empty');
+  els.generatedFilesList = document.getElementById('generated-files-list');
+  els.artifactPickerToggle = document.getElementById('artifact-picker-toggle');
+  els.artifactPickerMenu = document.getElementById('artifact-picker-menu');
+  els.artifactPickerCurrent = document.getElementById('artifact-picker-current');
+  els.currentArtifactTitle = document.getElementById('current-artifact-title');
+  els.currentArtifactMeta = document.getElementById('current-artifact-meta');
+  els.inlineEditor = document.getElementById('inline-editor');
+  els.inlineEditorTitle = document.getElementById('inline-editor-title');
+  els.inlineEditorInput = document.getElementById('inline-editor-input');
+  els.inlineEditorSave = document.getElementById('inline-editor-save');
+  els.inlineEditorCancel = document.getElementById('inline-editor-cancel');
   els.toolButtons = Array.from(document.querySelectorAll('[data-tool]'));
   els.drawToolToggle = document.getElementById('draw-tool-toggle');
   els.drawToolMenu = document.getElementById('draw-tool-menu');
@@ -109,6 +116,14 @@ const state = {
   statusPopoverOpen: false,
   helpPopoverOpen: false,
   drawToolMenuOpen: false,
+  generatedRequests: [],
+  inlineEditor: {
+    open: false,
+    annotationId: null,
+    value: '',
+    x: 0,
+    y: 0,
+  },
 };
 
 async function boot() {
@@ -138,6 +153,7 @@ async function boot() {
 
   resetSessionState();
   renderRequest(currentRequest);
+  await refreshGeneratedFiles();
 
   if (!actionsBound) {
     bindActions();
@@ -246,23 +262,29 @@ function updateToolMenu() {
 function closeTopbarPopovers() {
   const hasOpenOverlay =
     state.statusPopoverOpen || state.helpPopoverOpen || state.drawToolMenuOpen;
-  if (!hasOpenOverlay) {
-    return;
+  if (hasOpenOverlay) {
+    state.statusPopoverOpen = false;
+    state.helpPopoverOpen = false;
+    state.drawToolMenuOpen = false;
+    updateTopbarPopovers();
+    updateToolMenu();
   }
 
-  state.statusPopoverOpen = false;
-  state.helpPopoverOpen = false;
-  state.drawToolMenuOpen = false;
-  updateTopbarPopovers();
-  updateToolMenu();
+  if (state.artifactPickerOpen) {
+    state.artifactPickerOpen = false;
+    updateArtifactPicker();
+  }
 }
 
 function onDocumentPointerDown(event) {
-  if (
-    !state.statusPopoverOpen &&
-    !state.helpPopoverOpen &&
-    !state.drawToolMenuOpen
-  ) {
+  const hasTopbarOverlay =
+    state.statusPopoverOpen ||
+    state.helpPopoverOpen ||
+    state.drawToolMenuOpen ||
+    state.artifactPickerOpen;
+  const hasInlineEditor = state.inlineEditor && state.inlineEditor.open;
+
+  if (!hasTopbarOverlay && !hasInlineEditor) {
     return;
   }
 
@@ -274,12 +296,18 @@ function onDocumentPointerDown(event) {
     (els.helpInfoToggle && els.helpInfoToggle.contains(target)) ||
     (els.helpPopover && els.helpPopover.contains(target)) ||
     (els.drawToolToggle && els.drawToolToggle.contains(target)) ||
-    (els.drawToolMenu && els.drawToolMenu.contains(target))
+    (els.drawToolMenu && els.drawToolMenu.contains(target)) ||
+    (els.artifactPickerToggle && els.artifactPickerToggle.contains(target)) ||
+    (els.artifactPickerMenu && els.artifactPickerMenu.contains(target)) ||
+    (els.inlineEditor && els.inlineEditor.contains(target))
   ) {
     return;
   }
 
   closeTopbarPopovers();
+  if (hasInlineEditor) {
+    closeInlineEditor();
+  }
 }
 
 function renderRequest(request) {
@@ -541,11 +569,25 @@ function bindActions() {
     setZoom(1);
   });
 
-  ['input', 'change'].forEach((eventName) => {
-    els.inspectorInput.addEventListener(eventName, function onInspectorInput() {
-      applyInspectorValue(els.inspectorInput.value);
+  if (els.inlineEditorInput) {
+    ['input', 'change'].forEach((eventName) => {
+      els.inlineEditorInput.addEventListener(eventName, function onInlineEditorInput() {
+        state.inlineEditor.value = els.inlineEditorInput.value;
+      });
     });
-  });
+  }
+
+  if (els.inlineEditorSave) {
+    els.inlineEditorSave.addEventListener('click', function onInlineEditorSave() {
+      saveInlineEditor();
+    });
+  }
+
+  if (els.inlineEditorCancel) {
+    els.inlineEditorCancel.addEventListener('click', function onInlineEditorCancel() {
+      closeInlineEditor();
+    });
+  }
 
   if (els.statusInfoToggle) {
     els.statusInfoToggle.addEventListener(
@@ -581,6 +623,18 @@ function bindActions() {
     );
   }
 
+  if (els.artifactPickerToggle && els.artifactPickerMenu) {
+    els.artifactPickerToggle.addEventListener(
+      'click',
+      function onArtifactPickerToggle(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        state.artifactPickerOpen = !state.artifactPickerOpen;
+        updateArtifactPicker();
+      }
+    );
+  }
+
   if (els.drawToolGroup && els.drawToolToggle && els.drawToolMenu) {
     els.drawToolToggle.addEventListener(
       'click',
@@ -610,10 +664,11 @@ function bindActions() {
     });
   });
 
-  els.annotationLayer.addEventListener('pointerdown', onPointerDown);
-  els.annotationLayer.addEventListener('pointermove', onPointerMove);
-  els.annotationLayer.addEventListener('pointerup', onPointerUp);
-  els.annotationLayer.addEventListener('pointerleave', onPointerUp);
+  els.viewer.addEventListener('pointerdown', onPointerDown);
+  els.viewer.addEventListener('pointermove', onPointerMove);
+  els.viewer.addEventListener('pointerup', onPointerUp);
+  els.viewer.addEventListener('pointercancel', onPointerUp);
+  els.viewer.addEventListener('pointerleave', onPointerUp);
   els.annotationLayer.addEventListener('dblclick', onDoubleClick);
   els.viewer.addEventListener('wheel', onViewerWheel, { passive: false });
 }
@@ -627,13 +682,30 @@ function onPointerDown(event) {
     return;
   }
 
+  if (
+    event.target === els.viewer ||
+    event.target === els.viewerStage ||
+    event.target === els.artifactHost
+  ) {
+    if (state.tool === 'select' && isWithinArtifact(event)) {
+      beginMarquee(event);
+    } else {
+      state.selectedAnnotationId = null;
+      state.selectedAnnotationIds = [];
+      closeInlineEditor();
+      updateStatus();
+      renderAnnotations();
+    }
+    return;
+  }
+
   const handleInfo = findHandleInfo(event.target);
   if (handleInfo) {
     state.selectedAnnotationId = handleInfo.annotationId;
     state.selectedAnnotationIds = [handleInfo.annotationId];
     startHandleDragging(handleInfo, event);
+    closeInlineEditor();
     updateStatus();
-    updateInspector();
     renderAnnotations();
     return;
   }
@@ -646,8 +718,8 @@ function onPointerDown(event) {
     if (annotation && state.tool === 'select') {
       startAnnotationDrag(annotation, event);
     }
+    closeInlineEditor();
     updateStatus();
-    updateInspector();
     renderAnnotations();
     return;
   }
@@ -655,8 +727,8 @@ function onPointerDown(event) {
   if (!isWithinArtifact(event)) {
     state.selectedAnnotationId = null;
     state.selectedAnnotationIds = [];
+    closeInlineEditor();
     updateStatus();
-    updateInspector();
     renderAnnotations();
     return;
   }
@@ -689,8 +761,19 @@ function onPointerMove(event) {
   }
 }
 
-function onPointerUp() {
+function onPointerUp(event) {
   if (state.panning) {
+    if (
+      event &&
+      event.pointerId != null &&
+      els.viewer.releasePointerCapture &&
+      els.viewer.hasPointerCapture &&
+      els.viewer.hasPointerCapture(event.pointerId)
+    ) {
+      try {
+        els.viewer.releasePointerCapture(event.pointerId);
+      } catch {}
+    }
     state.panning = null;
     return;
   }
@@ -713,6 +796,16 @@ function onPointerUp() {
 }
 
 function onDoubleClick(event) {
+  const annotationId = findAnnotationId(event.target);
+  if (annotationId) {
+    state.selectedAnnotationId = annotationId;
+    state.selectedAnnotationIds = [annotationId];
+    updateStatus();
+    renderAnnotations();
+    openInlineEditor(annotationId);
+    return;
+  }
+
   if (state.tool !== 'text' || !isWithinArtifact(event)) {
     return;
   }
@@ -728,10 +821,11 @@ function onDoubleClick(event) {
 
   state.annotations.push(annotation);
   state.selectedAnnotationId = annotation.id;
+  state.selectedAnnotationIds = [annotation.id];
   state.newlyCreatedTextId = annotation.id;
   updateStatus();
-  updateInspector();
   renderAnnotations();
+  openInlineEditor(annotation.id);
 }
 
 function shouldStartPanning(event) {
@@ -739,7 +833,14 @@ function shouldStartPanning(event) {
 }
 
 function startPanning(event) {
+  if (event.pointerId != null && els.viewer.setPointerCapture) {
+    try {
+      els.viewer.setPointerCapture(event.pointerId);
+    } catch {}
+  }
+
   state.panning = {
+    pointerId: event.pointerId,
     pointerX: event.clientX,
     pointerY: event.clientY,
     scrollLeft: els.viewer.scrollLeft,
@@ -796,8 +897,8 @@ function finalizeMarquee() {
 
   state.selectedAnnotationIds = selectedIds;
   state.selectedAnnotationId = selectedIds[0] || null;
+  closeInlineEditor();
   updateStatus();
-  updateInspector();
   renderAnnotations();
 }
 
@@ -863,9 +964,8 @@ function finalizeDraft() {
     state.newlyCreatedTextId = annotation.id;
   }
   updateStatus();
-  updateInspector();
   renderAnnotations();
-  focusInspectorForNewAnnotation(annotation.id);
+  openInlineEditor(annotation.id);
 }
 
 function draftToAnnotation(draft) {
@@ -1098,8 +1198,8 @@ function duplicateSelectedAnnotation() {
   state.annotations.push(duplicate);
   state.selectedAnnotationId = duplicate.id;
   state.selectedAnnotationIds = [duplicate.id];
+  closeInlineEditor();
   updateStatus();
-  updateInspector();
   renderAnnotations();
 }
 
@@ -1118,8 +1218,8 @@ function deleteSelectedAnnotation() {
   state.annotations = state.annotations.filter((item) => !idSet.has(item.id));
   state.selectedAnnotationId = null;
   state.selectedAnnotationIds = [];
+  closeInlineEditor();
   updateStatus();
-  updateInspector();
   renderAnnotations();
 }
 
@@ -1131,8 +1231,8 @@ function clearAllAnnotations() {
   state.annotations = [];
   state.selectedAnnotationId = null;
   state.selectedAnnotationIds = [];
+  closeInlineEditor();
   updateStatus();
-  updateInspector();
   renderAnnotations();
 }
 
@@ -1143,8 +1243,7 @@ function getSelectedAnnotation() {
   );
 }
 
-function applyInspectorValue(value) {
-  const annotation = getSelectedAnnotation();
+function applyAnnotationValue(annotation, value) {
   if (!annotation) {
     return;
   }
@@ -1305,91 +1404,80 @@ function updateStatus() {
   }
 }
 
-function updateInspector() {
-  const annotation = getSelectedAnnotation();
-  const multiSelected = state.selectedAnnotationIds.length > 1;
-  const hasSelection = multiSelected || Boolean(annotation);
-
-  if (els.inspector) {
-    els.inspector.classList.toggle('is-empty', !hasSelection);
-  }
-
-  if (els.inspectorEmpty) {
-    els.inspectorEmpty.classList.toggle('hidden', hasSelection);
-  }
-
-  if (els.inspectorContent) {
-    els.inspectorContent.classList.toggle('hidden', !hasSelection);
-  }
-
-  if (!hasSelection) {
-    if (els.inspectorType) {
-      els.inspectorType.textContent = '';
-    }
-    if (els.inspectorLabel) {
-      els.inspectorLabel.textContent = 'Label / note';
-    }
-    if (els.inspectorInput) {
-      els.inspectorInput.value = '';
-      els.inspectorInput.disabled = false;
-      els.inspectorInput.placeholder = 'Write note or text here...';
-    }
+function openInlineEditor(annotationId) {
+  const annotation = state.annotations.find((item) => item.id === annotationId);
+  if (!annotation || !els.inlineEditor || !els.inlineEditorInput) {
     return;
   }
 
-  if (multiSelected) {
-    if (els.inspectorType) {
-      els.inspectorType.textContent = 'MULTI SELECT';
-    }
-    if (els.inspectorLabel) {
-      els.inspectorLabel.textContent = `Focused all (${state.selectedAnnotationIds.length} items)`;
-    }
-    if (els.inspectorInput) {
-      els.inspectorInput.value = '';
-      els.inspectorInput.disabled = true;
-      els.inspectorInput.placeholder =
-        'Multi-selection mode: text editing is disabled.';
-    }
-    return;
+  const point = getAnnotationEditorPoint(annotation);
+  state.inlineEditor.open = true;
+  state.inlineEditor.annotationId = annotationId;
+  state.inlineEditor.value = annotation.type === 'text' ? annotation.text || '' : annotation.label || '';
+  state.inlineEditor.x = point.x;
+  state.inlineEditor.y = point.y;
+
+  if (els.inlineEditorTitle) {
+    els.inlineEditorTitle.textContent = annotation.type === 'text' ? 'Edit text note' : 'Edit annotation note';
   }
 
-  if (els.inspectorType) {
-    els.inspectorType.textContent = annotation.type.toUpperCase();
-  }
+  els.inlineEditorInput.value = state.inlineEditor.value;
+  els.inlineEditor.classList.remove('hidden');
+  els.inlineEditor.style.left = `${state.inlineEditor.x}px`;
+  els.inlineEditor.style.top = `${state.inlineEditor.y}px`;
 
-  if (els.inspectorLabel) {
-    els.inspectorLabel.textContent =
-      annotation.type === 'text' ? 'Text content' : 'Label / note';
-  }
+  window.requestAnimationFrame(() => {
+    els.inlineEditorInput.focus();
+    const value = els.inlineEditorInput.value || '';
+    els.inlineEditorInput.setSelectionRange(value.length, value.length);
+    state.newlyCreatedTextId = null;
+  });
+}
 
-  if (els.inspectorInput) {
-    els.inspectorInput.disabled = false;
-    els.inspectorInput.placeholder = 'Write note or text here...';
-    els.inspectorInput.value =
-      annotation.type === 'text'
-        ? annotation.text || ''
-        : annotation.label || '';
+function closeInlineEditor() {
+  state.inlineEditor.open = false;
+  state.inlineEditor.annotationId = null;
+  state.inlineEditor.value = '';
+  if (els.inlineEditor) {
+    els.inlineEditor.classList.add('hidden');
   }
 }
 
-function focusInspectorForNewAnnotation(annotationId) {
-  if (!els.inspectorInput || !annotationId) {
+function saveInlineEditor() {
+  const annotation = getSelectedAnnotation();
+  if (!annotation || state.selectedAnnotationIds.length > 1) {
+    closeInlineEditor();
     return;
   }
 
-  window.requestAnimationFrame(() => {
-    if (
-      state.selectedAnnotationId !== annotationId ||
-      state.newlyCreatedTextId !== annotationId
-    ) {
-      return;
-    }
+  applyAnnotationValue(
+    annotation,
+    els.inlineEditorInput ? els.inlineEditorInput.value : state.inlineEditor.value
+  );
+  closeInlineEditor();
+}
 
-    els.inspectorInput.focus();
-    const value = els.inspectorInput.value || '';
-    els.inspectorInput.setSelectionRange(value.length, value.length);
-    state.newlyCreatedTextId = null;
-  });
+function getAnnotationEditorPoint(annotation) {
+  const margin = 12;
+
+  if (annotation.type === 'text') {
+    return {
+      x: annotation.x + margin,
+      y: Math.max(annotation.y - 18, 8),
+    };
+  }
+
+  if (annotation.type === 'rect') {
+    return {
+      x: annotation.x + Math.min(annotation.width + margin, 240),
+      y: Math.max(annotation.y, 8),
+    };
+  }
+
+  return {
+    x: Math.max((annotation.x1 + annotation.x2) / 2 + margin, 8),
+    y: Math.max((annotation.y1 + annotation.y2) / 2 - 12, 8),
+  };
 }
 
 function renderAnnotations() {
@@ -1670,6 +1758,8 @@ async function submit(status) {
       coordinateSpace: buildCoordinateSpace(),
       exportPayload,
     });
+
+    await refreshGeneratedFiles();
 
     state.lastSubmittedResult = {
       requestId: currentRequest.id,
@@ -1980,6 +2070,150 @@ function onArtifactReady() {
   refreshVendorUi();
 }
 
+async function refreshGeneratedFiles() {
+  if (!window.reviewApp || typeof window.reviewApp.listGeneratedFiles !== 'function') {
+    return;
+  }
+
+  try {
+    state.generatedRequests = await window.reviewApp.listGeneratedFiles();
+  } catch (error) {
+    debugTrace('generated-files:load-failed', {
+      message: error && error.message ? error.message : String(error),
+    });
+    state.generatedRequests = [];
+  }
+
+  renderGeneratedFiles();
+}
+
+function renderGeneratedFiles() {
+  if (!els.generatedFilesEmpty || !els.generatedFilesList) {
+    return;
+  }
+
+  const artifactFiles = getArtifactFiles();
+  els.generatedFilesList.innerHTML = '';
+
+  const hasItems = artifactFiles.length > 0;
+  els.generatedFilesEmpty.classList.toggle('hidden', hasItems);
+  els.generatedFilesList.classList.toggle('hidden', !hasItems);
+
+  const currentArtifactEntry = getCurrentArtifactEntry(artifactFiles);
+  const currentArtifact = currentArtifactEntry ? currentArtifactEntry.file : null;
+  if (els.artifactPickerCurrent) {
+    els.artifactPickerCurrent.textContent = currentArtifact
+      ? currentArtifact.name || 'Untitled artifact'
+      : 'No artifact selected';
+  }
+
+  if (els.currentArtifactTitle) {
+    els.currentArtifactTitle.textContent = currentArtifact
+      ? currentArtifact.name || 'Untitled artifact'
+      : 'No active artifact';
+  }
+
+  if (els.currentArtifactMeta) {
+    els.currentArtifactMeta.textContent = currentArtifactEntry
+      ? `${currentArtifactEntry.request.artifactType || 'unknown'} · ${formatDateTime(currentArtifact.createdAt || currentArtifactEntry.request.createdAt)} · ${currentArtifactEntry.request.title || currentArtifactEntry.request.requestId}`
+      : 'Waiting for request…';
+  }
+
+  if (!hasItems) {
+    updateArtifactPicker();
+    return;
+  }
+
+  artifactFiles.forEach((entry) => {
+    const file = entry.file;
+    const fileRow = document.createElement('div');
+    fileRow.className = 'generated-file-item';
+
+    const copy = document.createElement('div');
+    copy.className = 'generated-file-copy';
+
+    const fileName = document.createElement('div');
+    fileName.className = 'generated-file-name';
+    fileName.textContent = file.name || 'Unnamed artifact';
+    copy.appendChild(fileName);
+
+    const kind = document.createElement('div');
+    kind.className = 'generated-file-kind';
+    kind.textContent = `${entry.request.title || entry.request.requestId} · ${formatDateTime(file.createdAt || entry.request.createdAt)}`;
+    copy.appendChild(kind);
+
+    const openButton = document.createElement('button');
+    openButton.type = 'button';
+    openButton.className = 'generated-file-open';
+    openButton.textContent = 'Open';
+    openButton.addEventListener('click', async () => {
+      if (!window.reviewApp || typeof window.reviewApp.openGeneratedFile !== 'function') {
+        return;
+      }
+      await window.reviewApp.openGeneratedFile(file.path);
+      state.artifactPickerOpen = false;
+      updateArtifactPicker();
+    });
+
+    fileRow.appendChild(copy);
+    fileRow.appendChild(openButton);
+    els.generatedFilesList.appendChild(fileRow);
+  });
+
+  updateArtifactPicker();
+}
+
+function getArtifactFiles() {
+  return (Array.isArray(state.generatedRequests) ? state.generatedRequests : [])
+    .flatMap((request) =>
+      (Array.isArray(request.files) ? request.files : [])
+        .filter((file) => file && file.kind === 'artifact')
+        .map((file) => ({ request, file }))
+    )
+    .sort(
+      (a, b) =>
+        Date.parse(b.file.createdAt || b.request.createdAt || 0) -
+        Date.parse(a.file.createdAt || a.request.createdAt || 0)
+    );
+}
+
+function getCurrentArtifactEntry(artifactFiles = getArtifactFiles()) {
+  if (!currentRequest || !currentRequest.id) {
+    return artifactFiles[0] || null;
+  }
+
+  const matched = artifactFiles.find(
+    (entry) => entry.request.requestId === currentRequest.id
+  );
+  return matched || artifactFiles[0] || null;
+}
+
+function updateArtifactPicker() {
+  if (els.artifactPickerMenu) {
+    els.artifactPickerMenu.classList.toggle('hidden', !state.artifactPickerOpen);
+  }
+
+  if (els.artifactPickerToggle) {
+    els.artifactPickerToggle.setAttribute(
+      'aria-expanded',
+      state.artifactPickerOpen ? 'true' : 'false'
+    );
+  }
+}
+
+function formatDateTime(value) {
+  if (!value) {
+    return 'unknown time';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString();
+}
+
 function onWindowResize() {
   syncStageGeometry();
   syncArtifactMetrics();
@@ -1991,8 +2225,18 @@ function onWindowResize() {
 function onKeyDown(event) {
   if (event.target && ['INPUT', 'TEXTAREA'].includes(event.target.tagName)) {
     if (event.key === 'Escape') {
+      event.preventDefault();
+      closeInlineEditor();
       event.target.blur();
+      return;
     }
+
+    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+      event.preventDefault();
+      saveInlineEditor();
+      return;
+    }
+
     return;
   }
 

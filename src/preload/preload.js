@@ -27,6 +27,12 @@ contextBridge.exposeInMainWorld('reviewApp', {
   submitResult(payload) {
     return ipcRenderer.invoke('review:submit-result', payload);
   },
+  listGeneratedFiles() {
+    return ipcRenderer.invoke('review:list-generated-files');
+  },
+  openGeneratedFile(filePath) {
+    return ipcRenderer.invoke('review:open-generated-file', filePath);
+  },
   closeWindow() {
     return ipcRenderer.invoke('review:close-window');
   },

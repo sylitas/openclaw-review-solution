@@ -1,9 +1,27 @@
 'use strict';
 
 const { buildResult, writeExports } = require('../shared/result');
+const { registerRequestOutputs } = require('../shared/artifact-registry');
+const { getRequestTmpDir } = require('../shared/paths');
 const { createRecord } = require('./record-utils');
 
 function createQueueManager({ saveResult, createFailureResult, stateStore, onActiveRequest }) {
+  function registerRequestResult(record, result, generatedFiles = []) {
+    if (!record || !result) {
+      return;
+    }
+
+    registerRequestOutputs(record.request, result, [
+      {
+        kind: 'result-json',
+        path: `${getRequestTmpDir(record.id)}/result.json`,
+        name: 'result.json',
+        createdAt: result.reviewedAt,
+      },
+      ...generatedFiles,
+    ]);
+  }
+
   let activeRequest = null;
   let pendingQueue = [];
   const requests = new Map();
@@ -56,6 +74,7 @@ function createQueueManager({ saveResult, createFailureResult, stateStore, onAct
         hydrated.error = 'Daemon restarted while request was active.';
         hydrated.result = createFailureResult(hydrated.request, hydrated.error);
         saveResult(hydrated.id, hydrated.result);
+        registerRequestResult(hydrated, hydrated.result);
       }
 
       requests.set(hydrated.id, hydrated);
@@ -89,6 +108,7 @@ function createQueueManager({ saveResult, createFailureResult, stateStore, onAct
 
     if (result) {
       saveResult(record.id, result);
+      registerRequestResult(record, result, options.generatedFiles || []);
     }
 
     if (!options.skipPersist) {
@@ -108,7 +128,10 @@ function createQueueManager({ saveResult, createFailureResult, stateStore, onAct
     const result = buildResult(activeRequest.request, payload || {}, exportsInfo);
 
     const completedRequest = activeRequest;
-    finishRecord(completedRequest, result.status, result, null, { skipPersist: true });
+    finishRecord(completedRequest, result.status, result, null, {
+      skipPersist: true,
+      generatedFiles: (exportsInfo && exportsInfo.generatedFiles) || [],
+    });
     activeRequest = null;
     persistState();
     maybeStartNext();

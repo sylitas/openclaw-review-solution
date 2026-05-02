@@ -36,6 +36,22 @@ function getExportRoot(requestId) {
   return ensureDir(path.join(getExportsDir(), requestId));
 }
 
+function getProjectRoot() {
+  return path.resolve(__dirname, '..', '..');
+}
+
+function getTmpDir() {
+  return ensureDir(path.join(getProjectRoot(), 'tmp'));
+}
+
+function getGeneratedFilesManifestPath() {
+  return path.join(getTmpDir(), 'manifest.json');
+}
+
+function getRequestTmpDir(requestId) {
+  return ensureDir(path.join(getTmpDir(), 'requests', requestId));
+}
+
 module.exports = {
   ensureDir,
   getBaseDir,
@@ -44,4 +60,8 @@ module.exports = {
   getStateFilePath,
   getResultFilePath,
   getExportRoot,
+  getProjectRoot,
+  getTmpDir,
+  getGeneratedFilesManifestPath,
+  getRequestTmpDir,
 };
