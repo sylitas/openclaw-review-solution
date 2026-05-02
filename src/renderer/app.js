@@ -1493,7 +1493,22 @@ function getAnnotationEditorPoint(annotation) {
   };
 }
 
-function renderAnnotations() {
+let _renderScheduled = false;
+function scheduleRenderAnnotations() {
+  if (_renderScheduled) return;
+  _renderScheduled = true;
+  window.requestAnimationFrame(() => {
+    _renderScheduled = false;
+    performRenderAnnotations();
+    // after annotations updated, ensure inline editor follows selected annotation if open
+    if (state.inlineEditor && state.inlineEditor.open) {
+      updateInlineEditorPosition();
+    }
+  });
+}
+
+function performRenderAnnotations() {
+  // Minimal DOM churn: clear layer then append fresh nodes
   while (els.annotationLayer.firstChild) {
     els.annotationLayer.removeChild(els.annotationLayer.firstChild);
   }
@@ -1512,6 +1527,11 @@ function renderAnnotations() {
       els.annotationLayer.appendChild(draftNode);
     }
   }
+}
+
+// Backwards-compatible alias: immediate render request (schedules next frame)
+function renderAnnotations() {
+  scheduleRenderAnnotations();
 }
 
 function buildAnnotationNode(annotation) {
