@@ -11,22 +11,78 @@ const { createQueueManager } = require('./queue-manager');
 
 const projectRoot = path.resolve(__dirname, '..', '..');
 const stateStore = createStateStore();
+const ACTIVE_REQUEST_UI_GRACE_MS = 30000;
+const UI_REOPEN_DEBOUNCE_MS = 1500;
+const UI_HEARTBEAT_FRESH_MS = 5000;
 
 let queue = null;
+let lastUiHeartbeatAt = 0;
+let pendingRecoveryTimer = null;
+let recoveryAttemptCount = 0;
+
+function markUiHeartbeat(at) {
+  lastUiHeartbeatAt = at || Date.now();
+}
+
+function clearRecoveryTimer() {
+  if (pendingRecoveryTimer) {
+    clearTimeout(pendingRecoveryTimer);
+    pendingRecoveryTimer = null;
+  }
+}
+
+function isUiResponsive() {
+  return Boolean(lastUiHeartbeatAt) && Date.now() - lastUiHeartbeatAt <= UI_HEARTBEAT_FRESH_MS;
+}
+
+function scheduleUiRecovery(reason) {
+  const activeRequest = queue.getActiveRequest();
+  if (!activeRequest || activeRequest.status !== 'active') {
+    clearRecoveryTimer();
+    recoveryAttemptCount = 0;
+    return;
+  }
+
+  if (pendingRecoveryTimer) {
+    return;
+  }
+
+  pendingRecoveryTimer = setTimeout(() => {
+    pendingRecoveryTimer = null;
+
+    const latestActiveRequest = queue.getActiveRequest();
+    if (!latestActiveRequest || latestActiveRequest.status !== 'active') {
+      recoveryAttemptCount = 0;
+      return;
+    }
+
+    const inactiveForMs = Date.now() - Math.max(lastUiHeartbeatAt || 0, latestActiveRequest.startedAt ? Date.parse(latestActiveRequest.startedAt) : 0);
+
+    if (inactiveForMs >= ACTIVE_REQUEST_UI_GRACE_MS && recoveryAttemptCount >= 3) {
+      recoveryAttemptCount = 0;
+      queue.failActiveRequest(
+        `Review UI became unavailable before completing the request (${reason}).`
+      );
+      return;
+    }
+
+    recoveryAttemptCount += 1;
+    uiLauncher.ensureWindow();
+    scheduleUiRecovery(`reopen-attempt-${recoveryAttemptCount}`);
+  }, UI_REOPEN_DEBOUNCE_MS);
+}
 
 const uiLauncher = createUiLauncher({
   projectRoot,
   onLaunchError(error) {
     console.error(`[reviewd] Failed to launch UI: ${error.message}`);
-    queue.failActiveRequest(`Failed to launch UI: ${error.message}`);
+    scheduleUiRecovery(`launch-error:${error.message}`);
   },
   onWindowClosed() {
-    const activeRequest = queue.getActiveRequest();
-    if (activeRequest && activeRequest.status === 'active') {
-      queue.failActiveRequest(
-        'Review window was closed before completing the request.'
-      );
-    }
+    scheduleUiRecovery('window-closed');
+  },
+  onWindowHeartbeat(at) {
+    markUiHeartbeat(at);
   },
 });
 
@@ -35,6 +91,9 @@ queue = createQueueManager({
   createFailureResult,
   stateStore,
   onActiveRequest() {
+    recoveryAttemptCount = 0;
+    clearRecoveryTimer();
+    markUiHeartbeat();
     uiLauncher.ensureWindow();
   },
 });
@@ -71,7 +130,9 @@ async function handleHealth(_req, res) {
     ok: true,
     activeRequestId: queue.getActiveRequest() ? queue.getActiveRequest().id : null,
     queuedCount: queue.getQueuedCount(),
-    uiRunning: uiLauncher.isRunning(),
+    uiRunning: uiLauncher.isRunning() || isUiResponsive(),
+    lastUiHeartbeatAt: lastUiHeartbeatAt || null,
+    recoveryAttemptCount,
   });
 }
 
@@ -101,8 +162,27 @@ async function handleGetRequest(_req, res, requestId) {
 }
 
 async function handleCurrentSession(_req, res) {
+  markUiHeartbeat();
   const activeRequest = queue.getActiveRequest();
   sendJson(res, 200, { request: activeRequest ? activeRequest.request : null });
+}
+
+async function handleSessionHeartbeat(req, res) {
+  try {
+    const body = await collectJson(req);
+    clearRecoveryTimer();
+    recoveryAttemptCount = 0;
+    markUiHeartbeat();
+    sendJson(res, 200, {
+      ok: true,
+      activeRequestId: queue.getActiveRequest() ? queue.getActiveRequest().id : null,
+      requestId: body && body.requestId ? body.requestId : null,
+      uiRunning: true,
+      lastUiHeartbeatAt,
+    });
+  } catch (error) {
+    sendJson(res, 400, { error: error.message });
+  }
 }
 
 async function handleSessionResult(req, res, requestId) {
@@ -114,6 +194,9 @@ async function handleSessionResult(req, res, requestId) {
 
   try {
     const payload = await collectJson(req);
+    clearRecoveryTimer();
+    recoveryAttemptCount = 0;
+    markUiHeartbeat();
     const result = queue.completeActiveWithPayload(payload);
     sendJson(res, 200, { ok: true, result });
   } catch (error) {
@@ -142,6 +225,11 @@ async function handleRequest(req, res) {
 
   if (req.method === 'GET' && url.pathname === '/session/current') {
     await handleCurrentSession(req, res);
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/session/heartbeat') {
+    await handleSessionHeartbeat(req, res);
     return;
   }
 

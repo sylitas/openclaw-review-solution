@@ -125,7 +125,7 @@ body {
 
 .popover-card {
   position: absolute;
-  top: calc(100% + 12px);
+  top: calc(100% + 2px);
   right: 0;
   width: 360px;
   max-width: min(360px, calc(100vw - 48px));
@@ -404,14 +404,23 @@ body {
 }
 
 .annotation-arrow {
-  stroke: #1a1a2e;
+  stroke: #6680cc;
   stroke-width: 3;
   fill: none;
+  stroke-linecap: butt;
 }
 
 .annotation-group.is-selected .annotation-arrow {
-  stroke: #333;
+  stroke: #5b8cff;
   stroke-width: 3.5;
+}
+
+.annotation-arrow-head {
+  fill: #6680cc;
+}
+
+.annotation-group.is-selected .annotation-arrow-head {
+  fill: #5b8cff;
 }
 
 .annotation-label-bg {
@@ -427,6 +436,23 @@ body {
   font-family: Inter, system-ui, sans-serif;
 }
 
+.annotation-label {
+  fill: #6680cc;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: Inter, system-ui, sans-serif;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.annotation-label-inside {
+  fill: #6680cc;
+  font-size: 13px;
+  dominant-baseline: hanging;
+}
+
 .annotation-text-bg {
   fill: rgba(255, 255, 255, 0.92);
   stroke: #6680cc;
@@ -434,14 +460,14 @@ body {
 }
 
 .annotation-text {
-  fill: #1a1a2e;
+  fill: #6680cc;
   font-size: 14px;
   font-weight: 700;
   font-family: Inter, system-ui, sans-serif;
 }
 
 .annotation-text-fo {
-  color: #1a1a2e;
+  color: #6680cc;
   font-size: 14px;
   font-weight: 700;
   font-family: Inter, system-ui, sans-serif;
@@ -451,11 +477,18 @@ body {
   white-space: pre-wrap;
 }
 
-.handle-circle {
+.annotation-handle {
   fill: white;
   stroke: #5b8cff;
   stroke-width: 2;
   cursor: pointer;
+}
+
+.annotation-marquee {
+  fill: rgba(91, 140, 255, 0.14);
+  stroke: #5b8cff;
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
 }
 
 /* ── Mermaid diagram (rendered in isolated iframe) ── */
@@ -572,6 +605,13 @@ textarea:focus {
   box-shadow: 0 0 0 3px rgba(91, 140, 255, 0.15);
 }
 
+textarea:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+  color: var(--muted);
+  background: rgba(15, 23, 42, 0.56);
+}
+
 #annotation-meta-input {
   flex: 1 1 auto;
   min-height: 180px;
@@ -668,3 +708,5 @@ textarea:focus {
     min-height: 320px;
   }
 }
+
+
