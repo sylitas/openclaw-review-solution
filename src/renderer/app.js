@@ -2112,32 +2112,36 @@ function renderGeneratedFiles() {
   els.generatedFilesEmpty.classList.toggle('hidden', hasItems);
   els.generatedFilesList.classList.toggle('hidden', !hasItems);
 
-  const currentArtifactEntry = getCurrentArtifactEntry(artifactFiles);
+  const artifactFilesMmdOnly = artifactFiles.filter((entry) => {
+    const name = String(entry && entry.file && entry.file.name || '').toLowerCase();
+    return name.endsWith('.mmd') || name.endsWith('.mermaid');
+  });
+
+  const currentArtifactEntry = getCurrentArtifactEntry(artifactFilesMmdOnly);
   const currentArtifact = currentArtifactEntry ? currentArtifactEntry.file : null;
-  if (els.artifactPickerCurrent) {
-    els.artifactPickerCurrent.textContent = currentArtifact
-      ? currentArtifact.name || 'Untitled artifact'
-      : 'No artifact selected';
-  }
 
   if (els.currentArtifactTitle) {
-    els.currentArtifactTitle.textContent = currentArtifact
-      ? currentArtifact.name || 'Untitled artifact'
+    els.currentArtifactTitle.textContent = currentArtifactEntry
+      ? currentArtifactEntry.request.title || 'Untitled artifact'
       : 'No active artifact';
   }
 
   if (els.currentArtifactMeta) {
     els.currentArtifactMeta.textContent = currentArtifactEntry
-      ? `${currentArtifactEntry.request.artifactType || 'unknown'} · ${formatDateTime(currentArtifact.createdAt || currentArtifactEntry.request.createdAt)} · ${currentArtifactEntry.request.title || currentArtifactEntry.request.requestId}`
+      ? `${currentArtifact.name || 'Unnamed file'} · ${formatDateTime24(currentArtifact.createdAt || currentArtifactEntry.request.createdAt)}`
       : 'Waiting for request…';
   }
 
-  if (!hasItems) {
+  const hasMmdItems = artifactFilesMmdOnly.length > 0;
+  els.generatedFilesEmpty.classList.toggle('hidden', hasMmdItems);
+  els.generatedFilesList.classList.toggle('hidden', !hasMmdItems);
+
+  if (!hasMmdItems) {
     updateArtifactPicker();
     return;
   }
 
-  artifactFiles.forEach((entry) => {
+  artifactFilesMmdOnly.forEach((entry) => {
     const file = entry.file;
     const fileRow = document.createElement('div');
     fileRow.className = 'generated-file-item';
@@ -2147,12 +2151,12 @@ function renderGeneratedFiles() {
 
     const fileName = document.createElement('div');
     fileName.className = 'generated-file-name';
-    fileName.textContent = file.name || 'Unnamed artifact';
+    fileName.textContent = entry.request.title || 'Untitled artifact';
     copy.appendChild(fileName);
 
     const kind = document.createElement('div');
     kind.className = 'generated-file-kind';
-    kind.textContent = `${entry.request.title || entry.request.requestId} · ${formatDateTime(file.createdAt || entry.request.createdAt)}`;
+    kind.textContent = `${file.name || 'Unnamed file'} · ${formatDateTime24(file.createdAt || entry.request.createdAt)}`;
     copy.appendChild(kind);
 
     fileRow.tabIndex = 0;
@@ -2184,22 +2188,7 @@ function renderGeneratedFiles() {
       fileRow.click();
     });
 
-    const openButton = document.createElement('button');
-    openButton.type = 'button';
-    openButton.className = 'generated-file-open';
-    openButton.textContent = 'Open outside';
-    openButton.addEventListener('click', async (event) => {
-      event.stopPropagation();
-      if (!window.reviewApp || typeof window.reviewApp.openGeneratedFile !== 'function') {
-        return;
-      }
-      await window.reviewApp.openGeneratedFile(file.path);
-      state.artifactPickerOpen = false;
-      updateArtifactPicker();
-    });
-
     fileRow.appendChild(copy);
-    fileRow.appendChild(openButton);
     els.generatedFilesList.appendChild(fileRow);
   });
 
@@ -2263,6 +2252,26 @@ function formatDateTime(value) {
   }
 
   return date.toLocaleString();
+}
+
+function formatDateTime24(value) {
+  if (!value) {
+    return 'unknown time';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
 }
 
 function onWindowResize() {

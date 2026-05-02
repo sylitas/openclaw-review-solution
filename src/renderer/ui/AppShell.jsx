@@ -312,43 +312,38 @@ export function AppShell() {
 
         <aside className="review-panel">
           <section id="generated-files" className="inspector-card generated-files-card">
-            <div className="inspector-title">Current artifact</div>
-            <div className="current-artifact-card">
-              <div className="current-artifact-title-row">
-                <FileCode2 aria-hidden="true" />
-                <div className="current-artifact-copy">
-                  <div id="current-artifact-title" className="current-artifact-title">No active artifact</div>
-                  <div id="current-artifact-meta" className="current-artifact-meta">Waiting for request…</div>
-                </div>
-              </div>
-
-              <div className="artifact-dropdown">
-                <button
-                  id="artifact-picker-toggle"
-                  className="tool-btn artifact-picker-toggle"
-                  type="button"
-                  aria-label="Open artifact list"
-                  aria-haspopup="menu"
-                  aria-expanded="false"
-                >
-                  <span className="artifact-picker-label">
-                    <span className="artifact-picker-browse-label">Browse artifacts</span>
-                    <span id="artifact-picker-current">No artifact selected</span>
-                  </span>
-                  <ChevronDown className="draw-tool-chevron" aria-hidden="true" />
-                </button>
-
-                <div
-                  id="artifact-picker-menu"
-                  className="popover-card artifact-picker-menu hidden"
-                  role="menu"
-                  aria-label="Artifact files"
-                >
-                  <div id="generated-files-empty" className="inspector-empty artifact-picker-empty">
-                    No generated files yet.
+            <div className="artifact-dropdown artifact-dropdown-single">
+              <button
+                id="artifact-picker-toggle"
+                className="tool-btn artifact-picker-toggle artifact-picker-toggle-single"
+                type="button"
+                aria-label="Open artifact list"
+                aria-haspopup="menu"
+                aria-expanded="false"
+              >
+                <div className="artifact-picker-single-main">
+                  <span id="artifact-picker-current" className="hidden">No artifact selected</span>
+                  <div className="current-artifact-title-row current-artifact-title-row-single">
+                    <FileCode2 aria-hidden="true" />
+                    <div className="current-artifact-copy">
+                      <div id="current-artifact-title" className="current-artifact-title">No active artifact</div>
+                      <div id="current-artifact-meta" className="current-artifact-meta">Waiting for request…</div>
+                    </div>
                   </div>
-                  <div id="generated-files-list" className="generated-files-list hidden" />
                 </div>
+                <ChevronDown className="draw-tool-chevron" aria-hidden="true" />
+              </button>
+
+              <div
+                id="artifact-picker-menu"
+                className="popover-card artifact-picker-menu hidden"
+                role="menu"
+                aria-label="Artifact files"
+              >
+                <div id="generated-files-empty" className="inspector-empty artifact-picker-empty">
+                  No generated files yet.
+                </div>
+                <div id="generated-files-list" className="generated-files-list hidden" />
               </div>
             </div>
           </section>

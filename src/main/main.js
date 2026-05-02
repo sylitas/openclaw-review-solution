@@ -210,11 +210,12 @@ if (!hasLock) {
 
     const ext = path.extname(payload.filePath || '').toLowerCase();
     const artifactType = payload.artifactType || (
-      ext === '.html' ? 'html' :
-      ext === '.mmd' || ext === '.mermaid' ? 'mermaid' :
-      ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'].includes(ext) ? 'image' :
-      'image'
+      ext === '.mmd' || ext === '.mermaid' ? 'mermaid' : null
     );
+
+    if (artifactType !== 'mermaid') {
+      throw new Error('Only .mmd artifacts are supported in-app');
+    }
 
     const result = {
       id: payload.requestId || `generated:${Date.now()}`,
