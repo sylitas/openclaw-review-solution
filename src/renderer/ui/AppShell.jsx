@@ -287,16 +287,22 @@ export function AppShell() {
               <div id="artifact-host" className="artifact-host" />
               <svg id="annotation-layer" className="annotation-layer" />
               <div id="inline-editor" className="inline-editor hidden">
-                <div className="inline-editor-card">
-                  <div id="inline-editor-title" className="inline-editor-title">Edit note</div>
-                  <textarea
-                    id="inline-editor-input"
-                    rows="4"
-                    placeholder="Write note directly on design..."
-                  />
-                  <div className="inline-editor-actions">
-                    <button id="inline-editor-save" className="tool-btn" type="button">Save</button>
-                    <button id="inline-editor-cancel" className="tool-btn" type="button">Cancel</button>
+                <div className="slide-backdrop" id="inline-editor-backdrop"></div>
+                <div className="slide-panel" role="dialog" aria-modal="true">
+                  <div className="slide-panel-header">
+                    <div id="inline-editor-title" className="slide-panel-title">Edit note</div>
+                    <button id="inline-editor-close" className="tool-btn" aria-label="Close inline editor">✕</button>
+                  </div>
+                  <div className="slide-panel-body">
+                    <textarea
+                      id="inline-editor-input"
+                      rows="4"
+                      placeholder="Write note directly on design..."
+                    />
+                    <div className="inline-editor-actions">
+                      <button id="inline-editor-save" className="tool-btn" type="button">Save</button>
+                      <button id="inline-editor-cancel" className="tool-btn" type="button">Cancel</button>
+                    </div>
                   </div>
                 </div>
               </div>
