@@ -33,6 +33,9 @@ contextBridge.exposeInMainWorld('reviewApp', {
   openGeneratedFile(filePath) {
     return ipcRenderer.invoke('review:open-generated-file', filePath);
   },
+  loadGeneratedArtifact(payload) {
+    return ipcRenderer.invoke('review:load-generated-artifact', payload);
+  },
   closeWindow() {
     return ipcRenderer.invoke('review:close-window');
   },

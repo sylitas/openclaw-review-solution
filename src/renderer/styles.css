@@ -675,6 +675,16 @@ body {
   border-radius: 12px;
   padding: 10px;
   background: rgba(15, 23, 42, 0.52);
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.generated-file-item:hover,
+.generated-file-item:focus-visible {
+  border-color: #5b8cff;
+  background: rgba(37, 99, 235, 0.16);
+  outline: none;
+  transform: translateY(-1px);
 }
 
 .generated-file-copy {

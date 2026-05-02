@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('fs');
 const path = require('path');
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const { requestJson } = require('../shared/http');
@@ -199,6 +200,46 @@ if (!hasLock) {
       ok: result === '',
       error: result || null,
     };
+  });
+
+  ipcMain.handle('review:load-generated-artifact', async (_event, payload) => {
+    debugLog('ipc', 'review:load-generated-artifact', payload || null);
+    if (!payload || !payload.filePath) {
+      throw new Error('filePath is required');
+    }
+
+    const ext = path.extname(payload.filePath || '').toLowerCase();
+    const artifactType = payload.artifactType || (
+      ext === '.html' ? 'html' :
+      ext === '.mmd' || ext === '.mermaid' ? 'mermaid' :
+      ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'].includes(ext) ? 'image' :
+      'image'
+    );
+
+    const result = {
+      id: payload.requestId || `generated:${Date.now()}`,
+      title: payload.title || path.basename(payload.filePath),
+      prompt: payload.prompt || 'Viewing generated artifact',
+      artifactType,
+      createdAt: payload.createdAt || new Date().toISOString(),
+      sourcePath: payload.filePath,
+      requestId: payload.requestId || null,
+    };
+
+    if (artifactType === 'html' || artifactType === 'mermaid') {
+      result.inlineContent = fs.readFileSync(payload.filePath, 'utf8');
+      if (artifactType === 'mermaid') {
+        result.mermaidScriptUrl = `file://${path.join(
+          app.getAppPath(),
+          'node_modules',
+          'mermaid',
+          'dist',
+          'mermaid.min.js'
+        )}`;
+      }
+    }
+
+    return result;
   });
 
   ipcMain.handle('review:close-window', async () => {

@@ -119,6 +119,7 @@ const state = {
   helpPopoverOpen: false,
   drawToolMenuOpen: false,
   generatedRequests: [],
+  selectedGeneratedArtifact: null,
   inlineEditor: {
     open: false,
     annotationId: null,
@@ -2154,11 +2155,41 @@ function renderGeneratedFiles() {
     kind.textContent = `${entry.request.title || entry.request.requestId} · ${formatDateTime(file.createdAt || entry.request.createdAt)}`;
     copy.appendChild(kind);
 
+    fileRow.tabIndex = 0;
+    fileRow.addEventListener('click', async () => {
+      if (!window.reviewApp || typeof window.reviewApp.loadGeneratedArtifact !== 'function') {
+        return;
+      }
+      const loaded = await window.reviewApp.loadGeneratedArtifact({
+        filePath: file.path,
+        artifactType: entry.request.artifactType,
+        requestId: entry.request.requestId,
+        title: entry.request.title || file.name,
+        prompt: entry.request.title || 'Viewing generated artifact',
+        createdAt: file.createdAt || entry.request.createdAt,
+      });
+      state.selectedGeneratedArtifact = {
+        request: entry.request,
+        file,
+        loaded,
+      };
+      renderRequest(loaded);
+      state.artifactPickerOpen = false;
+      updateArtifactPicker();
+      renderGeneratedFiles();
+    });
+    fileRow.addEventListener('keydown', async (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      fileRow.click();
+    });
+
     const openButton = document.createElement('button');
     openButton.type = 'button';
     openButton.className = 'generated-file-open';
-    openButton.textContent = 'Open';
-    openButton.addEventListener('click', async () => {
+    openButton.textContent = 'Open outside';
+    openButton.addEventListener('click', async (event) => {
+      event.stopPropagation();
       if (!window.reviewApp || typeof window.reviewApp.openGeneratedFile !== 'function') {
         return;
       }
@@ -2190,6 +2221,14 @@ function getArtifactFiles() {
 }
 
 function getCurrentArtifactEntry(artifactFiles = getArtifactFiles()) {
+  if (state.selectedGeneratedArtifact && state.selectedGeneratedArtifact.file) {
+    const selectedPath = state.selectedGeneratedArtifact.file.path;
+    const matchedSelected = artifactFiles.find((entry) => entry.file && entry.file.path === selectedPath);
+    if (matchedSelected) {
+      return matchedSelected;
+    }
+  }
+
   if (!currentRequest || !currentRequest.id) {
     return artifactFiles[0] || null;
   }
