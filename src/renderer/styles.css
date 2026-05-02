@@ -427,6 +427,23 @@ body {
   font-family: Inter, system-ui, sans-serif;
 }
 
+.annotation-label {
+  fill: #1a1a2e;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: Inter, system-ui, sans-serif;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.annotation-label-inside {
+  fill: #7f1d1d;
+  font-size: 13px;
+  dominant-baseline: hanging;
+}
+
 .annotation-text-bg {
   fill: rgba(255, 255, 255, 0.92);
   stroke: #6680cc;

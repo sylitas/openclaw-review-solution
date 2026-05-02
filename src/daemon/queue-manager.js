@@ -81,7 +81,7 @@ function createQueueManager({ saveResult, createFailureResult, stateStore, onAct
     return record;
   }
 
-  function finishRecord(record, status, result, errorMessage) {
+  function finishRecord(record, status, result, errorMessage, options = {}) {
     record.status = status;
     record.completedAt = new Date().toISOString();
     record.result = result || null;
@@ -91,7 +91,9 @@ function createQueueManager({ saveResult, createFailureResult, stateStore, onAct
       saveResult(record.id, result);
     }
 
-    persistState();
+    if (!options.skipPersist) {
+      persistState();
+    }
   }
 
   function completeActiveWithPayload(payload) {
@@ -105,8 +107,10 @@ function createQueueManager({ saveResult, createFailureResult, stateStore, onAct
     );
     const result = buildResult(activeRequest.request, payload || {}, exportsInfo);
 
-    finishRecord(activeRequest, result.status, result, null);
+    const completedRequest = activeRequest;
+    finishRecord(completedRequest, result.status, result, null, { skipPersist: true });
     activeRequest = null;
+    persistState();
     maybeStartNext();
 
     return result;
@@ -117,9 +121,11 @@ function createQueueManager({ saveResult, createFailureResult, stateStore, onAct
       return;
     }
 
-    const result = createFailureResult(activeRequest.request, message);
-    finishRecord(activeRequest, 'failed', result, message);
+    const failedRequest = activeRequest;
+    const result = createFailureResult(failedRequest.request, message);
+    finishRecord(failedRequest, 'failed', result, message, { skipPersist: true });
     activeRequest = null;
+    persistState();
     maybeStartNext();
   }
 
