@@ -227,7 +227,6 @@ textarea {
   border-radius: 24px;
   background: linear-gradient(180deg, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.76));
   box-shadow: var(--shadow);
-  overflow: hidden;
 }
 
 .toolbar {
@@ -335,50 +334,12 @@ textarea {
   padding: 8px;
 }
 
-.tooltip-btn {
-  position: relative;
-}
-
-.tooltip-btn::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  left: 50%;
-  top: calc(100% + 8px);
-  bottom: auto;
-  transform: translateX(-50%) translateY(4px);
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: rgba(8, 15, 31, 0.96);
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  box-shadow: 0 16px 40px rgba(2, 6, 23, 0.4);
-  transition:
-    opacity 120ms ease,
-    transform 120ms ease;
-  z-index: 60;
-}
-
-.tooltip-btn:hover::after,
-.tooltip-btn:focus-visible::after {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-
 .tool-menu-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.tool-dropdown:hover .tool-menu,
-.tool-dropdown:focus-within .tool-menu {
-  display: block !important;
-}
 
 .tool-option {
   width: 100%;
@@ -495,6 +456,7 @@ textarea {
   align-self: stretch;
   padding: 18px;
   gap: 18px;
+  overflow: visible;
 }
 
 .inspector-card {
@@ -562,12 +524,27 @@ textarea:focus {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  overflow: visible;
+  position: relative;
+  z-index: 10;
 }
 
 .actions {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
+  overflow: visible;
+  position: relative;
+  z-index: 20;
+}
+
+.actions .tooltip-btn {
+  position: relative;
+  z-index: 30;
+}
+
+.actions .tooltip-btn::after {
+  z-index: 9999;
 }
 
 .action-icon-btn {

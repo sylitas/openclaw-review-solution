@@ -10,7 +10,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 8;
 const ZOOM_STEP = 0.25;
-const WHEEL_ZOOM_STEP = 0.18;
+const WHEEL_ZOOM_STEP = 0.3;
 const TRACKPAD_ZOOM_STEP = 0.0035;
 
 const els = {};
@@ -43,7 +43,9 @@ function captureElements() {
   els.annotationCount = document.getElementById('annotation-count');
   els.activeTool = document.getElementById('active-tool');
   els.artifactBoxState = document.getElementById('artifact-box-state');
-  els.daemonConnectionState = document.getElementById('daemon-connection-state');
+  els.daemonConnectionState = document.getElementById(
+    'daemon-connection-state'
+  );
   els.sessionModeState = document.getElementById('session-mode-state');
   els.queueState = document.getElementById('queue-state');
   els.requestState = document.getElementById('request-state');
@@ -55,21 +57,27 @@ function captureElements() {
   els.inspectorLabel = document.getElementById('inspector-label');
   els.inspectorInput = document.getElementById('annotation-meta-input');
   els.toolButtons = Array.from(document.querySelectorAll('[data-tool]'));
+  els.drawToolToggle = document.getElementById('draw-tool-toggle');
+  els.drawToolMenu = document.getElementById('draw-tool-menu');
+  els.drawToolGroup = document.getElementById('draw-tool-group');
+  els.drawToolIcons = Array.from(
+    document.querySelectorAll('[data-active-tool-icon]')
+  );
 }
 
 function hasRequiredElements() {
   return Boolean(
     els.title &&
-      els.prompt &&
-      els.artifactType &&
-      els.artifactHost &&
-      els.viewer &&
-      els.viewerStage &&
-      els.annotationLayer &&
-      els.message &&
-      els.approve &&
-      els.changes &&
-      els.cancel
+    els.prompt &&
+    els.artifactType &&
+    els.artifactHost &&
+    els.viewer &&
+    els.viewerStage &&
+    els.annotationLayer &&
+    els.message &&
+    els.approve &&
+    els.changes &&
+    els.cancel
   );
 }
 
@@ -78,12 +86,14 @@ let sessionPollTimer = null;
 let heartbeatTimer = null;
 let actionsBound = false;
 const state = {
-  tool: 'rect',
+  tool: 'select',
   annotations: [],
   draft: null,
+  marquee: null,
   stageRect: null,
   artifactMetrics: null,
   selectedAnnotationId: null,
+  selectedAnnotationIds: [],
   newlyCreatedTextId: null,
   dragging: null,
   panning: null,
@@ -98,6 +108,7 @@ const state = {
   lastSubmittedResult: null,
   statusPopoverOpen: false,
   helpPopoverOpen: false,
+  drawToolMenuOpen: false,
 };
 
 async function boot() {
@@ -135,14 +146,18 @@ async function boot() {
     window.addEventListener('keyup', onKeyUp);
     document.addEventListener('pointerdown', onDocumentPointerDown);
 
-    if (window.reviewApp && typeof window.reviewApp.onResultSubmitted === 'function') {
+    if (
+      window.reviewApp &&
+      typeof window.reviewApp.onResultSubmitted === 'function'
+    ) {
       window.reviewApp.onResultSubmitted(function onResultSubmitted(payload) {
         state.lastSubmittedResult = payload || null;
         state.isSubmitting = false;
         state.daemonConnected = true;
-        state.daemonError = payload && payload.status
-          ? `Review submitted: ${payload.status}`
-          : 'Review submitted.';
+        state.daemonError =
+          payload && payload.status
+            ? `Review submitted: ${payload.status}`
+            : 'Review submitted.';
         updateStatus();
       });
     }
@@ -165,9 +180,11 @@ async function boot() {
 function resetSessionState() {
   state.annotations = [];
   state.draft = null;
+  state.marquee = null;
   state.stageRect = null;
   state.artifactMetrics = null;
   state.selectedAnnotationId = null;
+  state.selectedAnnotationIds = [];
   state.newlyCreatedTextId = null;
   state.dragging = null;
   state.panning = null;
@@ -177,8 +194,10 @@ function resetSessionState() {
   state.lastSubmittedResult = null;
   state.statusPopoverOpen = false;
   state.helpPopoverOpen = false;
+  state.drawToolMenuOpen = false;
   els.message.value = '';
   updateTopbarPopovers();
+  updateToolMenu();
 }
 
 function refreshVendorUi() {
@@ -211,18 +230,39 @@ function updateTopbarPopovers() {
   }
 }
 
+function updateToolMenu() {
+  if (els.drawToolMenu) {
+    els.drawToolMenu.classList.toggle('hidden', !state.drawToolMenuOpen);
+  }
+
+  if (els.drawToolToggle) {
+    els.drawToolToggle.setAttribute(
+      'aria-expanded',
+      state.drawToolMenuOpen ? 'true' : 'false'
+    );
+  }
+}
+
 function closeTopbarPopovers() {
-  if (!state.statusPopoverOpen && !state.helpPopoverOpen) {
+  const hasOpenOverlay =
+    state.statusPopoverOpen || state.helpPopoverOpen || state.drawToolMenuOpen;
+  if (!hasOpenOverlay) {
     return;
   }
 
   state.statusPopoverOpen = false;
   state.helpPopoverOpen = false;
+  state.drawToolMenuOpen = false;
   updateTopbarPopovers();
+  updateToolMenu();
 }
 
 function onDocumentPointerDown(event) {
-  if (!state.statusPopoverOpen && !state.helpPopoverOpen) {
+  if (
+    !state.statusPopoverOpen &&
+    !state.helpPopoverOpen &&
+    !state.drawToolMenuOpen
+  ) {
     return;
   }
 
@@ -232,7 +272,9 @@ function onDocumentPointerDown(event) {
     (els.statusInfoToggle && els.statusInfoToggle.contains(target)) ||
     (els.statusPopover && els.statusPopover.contains(target)) ||
     (els.helpInfoToggle && els.helpInfoToggle.contains(target)) ||
-    (els.helpPopover && els.helpPopover.contains(target))
+    (els.helpPopover && els.helpPopover.contains(target)) ||
+    (els.drawToolToggle && els.drawToolToggle.contains(target)) ||
+    (els.drawToolMenu && els.drawToolMenu.contains(target))
   ) {
     return;
   }
@@ -249,7 +291,8 @@ function renderRequest(request) {
 
   if (!request) {
     els.title.textContent = 'Waiting for review request…';
-    els.prompt.textContent = 'The review window is idle. Submit a request from the CLI and it will appear here automatically.';
+    els.prompt.textContent =
+      'The review window is idle. Submit a request from the CLI and it will appear here automatically.';
     els.artifactType.textContent = 'IDLE';
     renderEmptyState('No active review request right now.');
     refreshVendorUi();
@@ -282,7 +325,9 @@ function renderRequest(request) {
 }
 
 function renderImage(request) {
-  debugTrace('renderImage', { sourcePath: request ? request.sourcePath : null });
+  debugTrace('renderImage', {
+    sourcePath: request ? request.sourcePath : null,
+  });
   setArtifactMode('image');
 
   const img = document.createElement('img');
@@ -357,7 +402,9 @@ function renderMermaidInIframe(host, source, mermaidScriptUrl) {
     'async function render() {',
     '  try {',
     '    mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "strict" });',
-    '    var result = await mermaid.render("mmd-" + Date.now(), `' + escapedSource + '`);',
+    '    var result = await mermaid.render("mmd-" + Date.now(), `' +
+      escapedSource +
+      '`);',
     '    document.getElementById("diagram").innerHTML = result.svg;',
     '    var svg = document.querySelector("svg");',
     '    if (svg) {',
@@ -379,7 +426,7 @@ function renderMermaidInIframe(host, source, mermaidScriptUrl) {
     '}',
     'render();',
     '<\/script>',
-    '</body></html>'
+    '</body></html>',
   ].join('\n');
 
   function onMessage(event) {
@@ -390,7 +437,7 @@ function renderMermaidInIframe(host, source, mermaidScriptUrl) {
     if (event.data.type === 'mermaid-ready') {
       var h = parseInt(event.data.height, 10);
       if (h && h > 0) {
-        iframe.style.height = (h + 48) + 'px';
+        iframe.style.height = h + 48 + 'px';
       }
 
       window.removeEventListener('message', onMessage);
@@ -501,33 +548,64 @@ function bindActions() {
   });
 
   if (els.statusInfoToggle) {
-    els.statusInfoToggle.addEventListener('click', function onStatusInfoToggle(event) {
-      event.preventDefault();
-      event.stopPropagation();
-      state.statusPopoverOpen = !state.statusPopoverOpen;
-      if (state.statusPopoverOpen) {
-        state.helpPopoverOpen = false;
+    els.statusInfoToggle.addEventListener(
+      'click',
+      function onStatusInfoToggle(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        state.statusPopoverOpen = !state.statusPopoverOpen;
+        if (state.statusPopoverOpen) {
+          state.helpPopoverOpen = false;
+          state.drawToolMenuOpen = false;
+        }
+        updateTopbarPopovers();
+        updateToolMenu();
       }
-      updateTopbarPopovers();
-    });
+    );
   }
 
   if (els.helpInfoToggle) {
-    els.helpInfoToggle.addEventListener('click', function onHelpInfoToggle(event) {
-      event.preventDefault();
-      event.stopPropagation();
-      state.helpPopoverOpen = !state.helpPopoverOpen;
-      if (state.helpPopoverOpen) {
-        state.statusPopoverOpen = false;
+    els.helpInfoToggle.addEventListener(
+      'click',
+      function onHelpInfoToggle(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        state.helpPopoverOpen = !state.helpPopoverOpen;
+        if (state.helpPopoverOpen) {
+          state.statusPopoverOpen = false;
+          state.drawToolMenuOpen = false;
+        }
+        updateTopbarPopovers();
+        updateToolMenu();
       }
-      updateTopbarPopovers();
-    });
+    );
+  }
+
+  if (els.drawToolGroup && els.drawToolToggle && els.drawToolMenu) {
+    els.drawToolToggle.addEventListener(
+      'click',
+      function onDrawToolToggleClick(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        state.drawToolMenuOpen = !state.drawToolMenuOpen;
+        if (state.drawToolMenuOpen) {
+          state.statusPopoverOpen = false;
+          state.helpPopoverOpen = false;
+        }
+        updateTopbarPopovers();
+        updateToolMenu();
+      }
+    );
   }
 
   els.toolButtons.forEach((button) => {
-    button.addEventListener('click', function onToolSelect() {
+    button.addEventListener('click', function onToolSelect(event) {
+      event.preventDefault();
+      event.stopPropagation();
       state.tool = button.dataset.tool;
+      state.drawToolMenuOpen = false;
       updateToolButtons();
+      updateToolMenu();
       updateStatus();
     });
   });
@@ -552,6 +630,7 @@ function onPointerDown(event) {
   const handleInfo = findHandleInfo(event.target);
   if (handleInfo) {
     state.selectedAnnotationId = handleInfo.annotationId;
+    state.selectedAnnotationIds = [handleInfo.annotationId];
     startHandleDragging(handleInfo, event);
     updateStatus();
     updateInspector();
@@ -562,8 +641,9 @@ function onPointerDown(event) {
   const annotationId = findAnnotationId(event.target);
   if (annotationId) {
     state.selectedAnnotationId = annotationId;
+    state.selectedAnnotationIds = [annotationId];
     const annotation = getSelectedAnnotation();
-    if (annotation) {
+    if (annotation && state.tool === 'select') {
       startAnnotationDrag(annotation, event);
     }
     updateStatus();
@@ -574,9 +654,15 @@ function onPointerDown(event) {
 
   if (!isWithinArtifact(event)) {
     state.selectedAnnotationId = null;
+    state.selectedAnnotationIds = [];
     updateStatus();
     updateInspector();
     renderAnnotations();
+    return;
+  }
+
+  if (state.tool === 'select') {
+    beginMarquee(event);
     return;
   }
 
@@ -597,6 +683,10 @@ function onPointerMove(event) {
   if (state.draft) {
     updateDraft(event);
   }
+
+  if (state.marquee) {
+    updateMarquee(event);
+  }
 }
 
 function onPointerUp() {
@@ -607,6 +697,11 @@ function onPointerUp() {
 
   if (state.dragging) {
     state.dragging = null;
+    return;
+  }
+
+  if (state.marquee) {
+    finalizeMarquee();
     return;
   }
 
@@ -663,6 +758,49 @@ function continuePanning(event) {
   els.viewer.scrollTop = state.panning.scrollTop - deltaY;
 }
 
+function beginMarquee(event) {
+  const point = pointerToArtifactPoint(event);
+  if (!point) {
+    return;
+  }
+
+  state.marquee = {
+    start: point,
+    end: point,
+  };
+  renderAnnotations();
+}
+
+function updateMarquee(event) {
+  const point = pointerToArtifactPoint(event);
+  if (!point || !state.marquee) {
+    return;
+  }
+
+  state.marquee.end = point;
+  renderAnnotations();
+}
+
+function finalizeMarquee() {
+  const marquee = state.marquee;
+  state.marquee = null;
+
+  if (!marquee) {
+    return;
+  }
+
+  const bounds = normalizeBounds(marquee.start, marquee.end);
+  const selectedIds = state.annotations
+    .filter((annotation) => annotationIntersectsBounds(annotation, bounds))
+    .map((annotation) => annotation.id);
+
+  state.selectedAnnotationIds = selectedIds;
+  state.selectedAnnotationId = selectedIds[0] || null;
+  updateStatus();
+  updateInspector();
+  renderAnnotations();
+}
+
 function beginDraft(event) {
   const point = pointerToArtifactPoint(event);
   if (!point) {
@@ -716,9 +854,18 @@ function finalizeDraft() {
 
   state.annotations.push(annotation);
   state.selectedAnnotationId = annotation.id;
+  state.selectedAnnotationIds = [annotation.id];
+  if (
+    annotation.type === 'rect' ||
+    annotation.type === 'arrow' ||
+    annotation.type === 'text'
+  ) {
+    state.newlyCreatedTextId = annotation.id;
+  }
   updateStatus();
   updateInspector();
   renderAnnotations();
+  focusInspectorForNewAnnotation(annotation.id);
 }
 
 function draftToAnnotation(draft) {
@@ -778,7 +925,9 @@ function startAnnotationDrag(annotation, event) {
 }
 
 function startHandleDragging(handleInfo, event) {
-  const annotation = state.annotations.find((item) => item.id === handleInfo.annotationId);
+  const annotation = state.annotations.find(
+    (item) => item.id === handleInfo.annotationId
+  );
   if (!annotation) {
     return;
   }
@@ -818,7 +967,13 @@ function continueDragging(event) {
   }
 
   if (state.dragging.mode === 'handle') {
-    applyHandleMove(annotation, state.dragging.annotationSnapshot, state.dragging.handle, dx, dy);
+    applyHandleMove(
+      annotation,
+      state.dragging.annotationSnapshot,
+      state.dragging.handle,
+      dx,
+      dy
+    );
   }
 
   updateStatus();
@@ -908,6 +1063,11 @@ function undoLastAnnotation() {
   if (removed && removed.id === state.selectedAnnotationId) {
     state.selectedAnnotationId = null;
   }
+  if (removed) {
+    state.selectedAnnotationIds = state.selectedAnnotationIds.filter(
+      (id) => id !== removed.id
+    );
+  }
 
   updateStatus();
   updateInspector();
@@ -937,20 +1097,27 @@ function duplicateSelectedAnnotation() {
 
   state.annotations.push(duplicate);
   state.selectedAnnotationId = duplicate.id;
+  state.selectedAnnotationIds = [duplicate.id];
   updateStatus();
   updateInspector();
   renderAnnotations();
 }
 
 function deleteSelectedAnnotation() {
-  if (!state.selectedAnnotationId) {
+  const idsToDelete = state.selectedAnnotationIds.length
+    ? state.selectedAnnotationIds
+    : state.selectedAnnotationId
+      ? [state.selectedAnnotationId]
+      : [];
+
+  if (!idsToDelete.length) {
     return;
   }
 
-  state.annotations = state.annotations.filter(
-    (item) => item.id !== state.selectedAnnotationId
-  );
+  const idSet = new Set(idsToDelete);
+  state.annotations = state.annotations.filter((item) => !idSet.has(item.id));
   state.selectedAnnotationId = null;
+  state.selectedAnnotationIds = [];
   updateStatus();
   updateInspector();
   renderAnnotations();
@@ -963,13 +1130,17 @@ function clearAllAnnotations() {
 
   state.annotations = [];
   state.selectedAnnotationId = null;
+  state.selectedAnnotationIds = [];
   updateStatus();
   updateInspector();
   renderAnnotations();
 }
 
 function getSelectedAnnotation() {
-  return state.annotations.find((item) => item.id === state.selectedAnnotationId) || null;
+  return (
+    state.annotations.find((item) => item.id === state.selectedAnnotationId) ||
+    null
+  );
 }
 
 function applyInspectorValue(value) {
@@ -982,15 +1153,85 @@ function applyInspectorValue(value) {
     annotation.text = value;
   } else {
     annotation.label = value;
+    if (annotation.type === 'rect') {
+      expandRectToFitLabel(annotation);
+    }
   }
 
   renderAnnotations();
 }
 
+function expandRectToFitLabel(rect) {
+  if (!rect || rect.type !== 'rect') {
+    return;
+  }
+
+  const metrics = measureRectLabel(rect.label || '');
+  if (!metrics) {
+    return;
+  }
+
+  rect.width = Math.max(rect.width, metrics.width);
+  rect.height = Math.max(rect.height, metrics.height);
+}
+
+function measureRectLabel(label) {
+  const lines = String(label || '').split(/\r?\n/);
+  if (!lines.length || lines.every((line) => !line)) {
+    return null;
+  }
+
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  if (!context) {
+    return null;
+  }
+
+  context.font = '600 13px Inter, system-ui, sans-serif';
+
+  const paddingLeft = 10;
+  const paddingRight = 14;
+  const paddingTop = 18;
+  const paddingBottom = 12;
+  const lineHeight = 16;
+  const widestLine = lines.reduce((maxWidth, line) => {
+    const nextWidth = context.measureText(line || ' ').width;
+    return Math.max(maxWidth, nextWidth);
+  }, 0);
+
+  return {
+    width: Math.ceil(paddingLeft + widestLine + paddingRight),
+    height: Math.ceil(
+      paddingTop + Math.max(lines.length - 1, 0) * lineHeight + paddingBottom
+    ),
+  };
+}
+
 function updateToolButtons() {
   els.toolButtons.forEach((button) => {
-    button.classList.toggle('is-active', button.dataset.tool === state.tool);
+    const isActive = button.dataset.tool === state.tool;
+    button.classList.toggle('is-active', isActive);
+    button.setAttribute('aria-checked', isActive ? 'true' : 'false');
   });
+
+  els.drawToolIcons.forEach((iconNode) => {
+    iconNode.classList.toggle(
+      'hidden',
+      iconNode.dataset.activeToolIcon !== state.tool
+    );
+  });
+
+  if (els.drawToolToggle) {
+    const activeButton = els.toolButtons.find(
+      (button) => button.dataset.tool === state.tool
+    );
+    els.drawToolToggle.setAttribute(
+      'aria-label',
+      activeButton
+        ? `Drawing tools: ${activeButton.dataset.tool}`
+        : 'Drawing tools'
+    );
+  }
 
   if (els.activeTool) {
     els.activeTool.textContent = `Tool: ${state.tool}`;
@@ -1007,9 +1248,12 @@ function updateStatus() {
   }
 
   if (els.selectionState) {
-    els.selectionState.textContent = state.selectedAnnotationId
-      ? `Selected: ${state.selectedAnnotationId}`
-      : 'Selected: none';
+    els.selectionState.textContent =
+      state.selectedAnnotationIds.length > 1
+        ? `Selected: ${state.selectedAnnotationIds.length} items`
+        : state.selectedAnnotationId
+          ? `Selected: ${state.selectedAnnotationId}`
+          : 'Selected: none';
   }
 
   if (els.annotationCount) {
@@ -1030,7 +1274,9 @@ function updateStatus() {
   }
 
   if (els.sessionModeState) {
-    els.sessionModeState.textContent = currentRequest ? 'Session: active request' : 'Session: idle';
+    els.sessionModeState.textContent = currentRequest
+      ? 'Session: active request'
+      : 'Session: idle';
     els.sessionModeState.className = `status-pill ${currentRequest ? 'status-pill-primary' : 'status-pill-neutral'}`;
   }
 
@@ -1061,7 +1307,8 @@ function updateStatus() {
 
 function updateInspector() {
   const annotation = getSelectedAnnotation();
-  const hasSelection = Boolean(annotation);
+  const multiSelected = state.selectedAnnotationIds.length > 1;
+  const hasSelection = multiSelected || Boolean(annotation);
 
   if (els.inspector) {
     els.inspector.classList.toggle('is-empty', !hasSelection);
@@ -1075,7 +1322,7 @@ function updateInspector() {
     els.inspectorContent.classList.toggle('hidden', !hasSelection);
   }
 
-  if (!annotation) {
+  if (!hasSelection) {
     if (els.inspectorType) {
       els.inspectorType.textContent = '';
     }
@@ -1084,6 +1331,24 @@ function updateInspector() {
     }
     if (els.inspectorInput) {
       els.inspectorInput.value = '';
+      els.inspectorInput.disabled = false;
+      els.inspectorInput.placeholder = 'Write note or text here...';
+    }
+    return;
+  }
+
+  if (multiSelected) {
+    if (els.inspectorType) {
+      els.inspectorType.textContent = 'MULTI SELECT';
+    }
+    if (els.inspectorLabel) {
+      els.inspectorLabel.textContent = `Focused all (${state.selectedAnnotationIds.length} items)`;
+    }
+    if (els.inspectorInput) {
+      els.inspectorInput.value = '';
+      els.inspectorInput.disabled = true;
+      els.inspectorInput.placeholder =
+        'Multi-selection mode: text editing is disabled.';
     }
     return;
   }
@@ -1093,12 +1358,38 @@ function updateInspector() {
   }
 
   if (els.inspectorLabel) {
-    els.inspectorLabel.textContent = annotation.type === 'text' ? 'Text content' : 'Label / note';
+    els.inspectorLabel.textContent =
+      annotation.type === 'text' ? 'Text content' : 'Label / note';
   }
 
   if (els.inspectorInput) {
-    els.inspectorInput.value = annotation.type === 'text' ? annotation.text || '' : annotation.label || '';
+    els.inspectorInput.disabled = false;
+    els.inspectorInput.placeholder = 'Write note or text here...';
+    els.inspectorInput.value =
+      annotation.type === 'text'
+        ? annotation.text || ''
+        : annotation.label || '';
   }
+}
+
+function focusInspectorForNewAnnotation(annotationId) {
+  if (!els.inspectorInput || !annotationId) {
+    return;
+  }
+
+  window.requestAnimationFrame(() => {
+    if (
+      state.selectedAnnotationId !== annotationId ||
+      state.newlyCreatedTextId !== annotationId
+    ) {
+      return;
+    }
+
+    els.inspectorInput.focus();
+    const value = els.inspectorInput.value || '';
+    els.inspectorInput.setSelectionRange(value.length, value.length);
+    state.newlyCreatedTextId = null;
+  });
 }
 
 function renderAnnotations() {
@@ -1109,6 +1400,10 @@ function renderAnnotations() {
   state.annotations.forEach((annotation) => {
     els.annotationLayer.appendChild(buildAnnotationNode(annotation));
   });
+
+  if (state.marquee) {
+    els.annotationLayer.appendChild(buildMarqueeNode(state.marquee));
+  }
 
   if (state.draft) {
     const draftNode = buildDraftNode(state.draft);
@@ -1122,7 +1417,7 @@ function buildAnnotationNode(annotation) {
   const group = document.createElementNS(SVG_NS, 'g');
   group.setAttribute('class', 'annotation');
   group.dataset.annotationId = annotation.id;
-  group.classList.toggle('is-selected', annotation.id === state.selectedAnnotationId);
+  group.classList.toggle('is-selected', isAnnotationSelected(annotation.id));
 
   if (annotation.type === 'rect') {
     appendRectNode(group, annotation);
@@ -1137,6 +1432,13 @@ function buildAnnotationNode(annotation) {
   }
 
   return group;
+}
+
+function isAnnotationSelected(annotationId) {
+  return (
+    annotationId === state.selectedAnnotationId ||
+    state.selectedAnnotationIds.includes(annotationId)
+  );
 }
 
 function buildDraftNode(draft) {
@@ -1163,6 +1465,17 @@ function buildDraftNode(draft) {
   return group;
 }
 
+function buildMarqueeNode(marquee) {
+  const bounds = normalizeBounds(marquee.start, marquee.end);
+  const node = document.createElementNS(SVG_NS, 'rect');
+  node.setAttribute('class', 'annotation-marquee');
+  node.setAttribute('x', bounds.x);
+  node.setAttribute('y', bounds.y);
+  node.setAttribute('width', bounds.width);
+  node.setAttribute('height', bounds.height);
+  return node;
+}
+
 function appendRectNode(group, rect, isDraft) {
   const node = document.createElementNS(SVG_NS, 'rect');
   node.setAttribute('class', 'annotation-rect');
@@ -1176,7 +1489,7 @@ function appendRectNode(group, rect, isDraft) {
     group.appendChild(createRectLabelNode(rect));
   }
 
-  if (!isDraft && rect.id === state.selectedAnnotationId) {
+  if (!isDraft && isAnnotationSelected(rect.id)) {
     appendRectHandles(group, rect);
   }
 }
@@ -1195,15 +1508,17 @@ function appendRectHandles(group, rect) {
 }
 
 function appendArrowNode(group, arrow, isDraft) {
+  const geometry = getArrowHeadGeometry(arrow);
+
   const line = document.createElementNS(SVG_NS, 'line');
   line.setAttribute('class', 'annotation-arrow');
   line.setAttribute('x1', arrow.x1);
   line.setAttribute('y1', arrow.y1);
-  line.setAttribute('x2', arrow.x2);
-  line.setAttribute('y2', arrow.y2);
+  line.setAttribute('x2', geometry ? geometry.lineEndX : arrow.x2);
+  line.setAttribute('y2', geometry ? geometry.lineEndY : arrow.y2);
   group.appendChild(line);
 
-  const head = createArrowHead(arrow);
+  const head = createArrowHead(geometry);
   if (head) {
     group.appendChild(head);
   }
@@ -1218,13 +1533,13 @@ function appendArrowNode(group, arrow, isDraft) {
     );
   }
 
-  if (!isDraft && arrow.id === state.selectedAnnotationId) {
+  if (!isDraft && isAnnotationSelected(arrow.id)) {
     group.appendChild(createHandle(arrow.id, 'start', arrow.x1, arrow.y1));
     group.appendChild(createHandle(arrow.id, 'end', arrow.x2, arrow.y2));
   }
 }
 
-function createArrowHead(arrow) {
+function getArrowHeadGeometry(arrow) {
   const dx = arrow.x2 - arrow.x1;
   const dy = arrow.y2 - arrow.y1;
   const length = Math.sqrt(dx * dx + dy * dy);
@@ -1235,16 +1550,35 @@ function createArrowHead(arrow) {
 
   const ux = dx / length;
   const uy = dy / length;
-  const size = 14;
-  const leftX = arrow.x2 - ux * size - uy * (size * 0.45);
-  const leftY = arrow.y2 - uy * size + ux * (size * 0.45);
-  const rightX = arrow.x2 - ux * size + uy * (size * 0.45);
-  const rightY = arrow.y2 - uy * size - ux * (size * 0.45);
+  const headLength = Math.min(10, Math.max(7, length * 0.18));
+  const headWidth = headLength * 0.5;
+  const tipInset = Math.min(1.5, headLength * 0.15);
+  const tipX = arrow.x2 - ux * tipInset;
+  const tipY = arrow.y2 - uy * tipInset;
+  const baseX = tipX - ux * headLength;
+  const baseY = tipY - uy * headLength;
+
+  return {
+    tipX,
+    tipY,
+    leftX: baseX - uy * headWidth,
+    leftY: baseY + ux * headWidth,
+    rightX: baseX + uy * headWidth,
+    rightY: baseY - ux * headWidth,
+    lineEndX: baseX,
+    lineEndY: baseY,
+  };
+}
+
+function createArrowHead(geometry) {
+  if (!geometry) {
+    return null;
+  }
 
   const node = document.createElementNS(SVG_NS, 'path');
   node.setAttribute(
     'd',
-    `M ${arrow.x2} ${arrow.y2} L ${leftX} ${leftY} L ${rightX} ${rightY} Z`
+    `M ${geometry.tipX} ${geometry.tipY} L ${geometry.leftX} ${geometry.leftY} L ${geometry.rightX} ${geometry.rightY} Z`
   );
   node.setAttribute('class', 'annotation-arrow-head');
   return node;
@@ -1264,7 +1598,16 @@ function createLabelNode(label, x, y) {
   text.setAttribute('class', 'annotation-label');
   text.setAttribute('x', x);
   text.setAttribute('y', y);
-  text.textContent = label;
+
+  const lines = String(label || '').split(/\r?\n/);
+  lines.forEach((line, index) => {
+    const tspan = document.createElementNS(SVG_NS, 'tspan');
+    tspan.setAttribute('x', x);
+    tspan.setAttribute('dy', index === 0 ? '0' : '1.2em');
+    tspan.textContent = line;
+    text.appendChild(tspan);
+  });
+
   return text;
 }
 
@@ -1279,7 +1622,7 @@ function createRectLabelNode(rect) {
   text.setAttribute('x', rect.x + paddingX);
   text.setAttribute('y', rect.y + paddingY);
 
-  const lines = String(rect.label || '').split(/\r?\n/).slice(0, 4);
+  const lines = String(rect.label || '').split(/\r?\n/);
   lines.forEach((line, index) => {
     const tspan = document.createElementNS(SVG_NS, 'tspan');
     tspan.setAttribute('x', rect.x + paddingX);
@@ -1297,7 +1640,7 @@ function createHandle(annotationId, handle, x, y) {
   circle.setAttribute('class', 'annotation-handle');
   circle.setAttribute('cx', x);
   circle.setAttribute('cy', y);
-  circle.setAttribute('r', 6);
+  circle.setAttribute('r', 4.5);
   circle.dataset.annotationId = annotationId;
   circle.dataset.handle = handle;
   return circle;
@@ -1331,7 +1674,8 @@ async function submit(status) {
     state.lastSubmittedResult = {
       requestId: currentRequest.id,
       status,
-      nextRequestId: result && result.nextRequest ? result.nextRequest.id || null : null,
+      nextRequestId:
+        result && result.nextRequest ? result.nextRequest.id || null : null,
     };
     state.daemonError = `Review submitted: ${status}`;
     updateStatus();
@@ -1370,14 +1714,15 @@ function buildCoordinateSpace() {
     kind: 'normalized-artifact-box',
     stageWidth: Number.isFinite(sceneWidth) ? sceneWidth : null,
     stageHeight: Number.isFinite(sceneHeight) ? sceneHeight : null,
-    artifactBox: metrics && sceneWidth > 0 && sceneHeight > 0
-      ? {
-          x: metrics.x / sceneWidth,
-          y: metrics.y / sceneHeight,
-          width: metrics.width / sceneWidth,
-          height: metrics.height / sceneHeight,
-        }
-      : null,
+    artifactBox:
+      metrics && sceneWidth > 0 && sceneHeight > 0
+        ? {
+            x: metrics.x / sceneWidth,
+            y: metrics.y / sceneHeight,
+            width: metrics.width / sceneWidth,
+            height: metrics.height / sceneHeight,
+          }
+        : null,
     exportWidth: metrics ? metrics.width : null,
     exportHeight: metrics ? metrics.height : null,
   };
@@ -1421,15 +1766,21 @@ function serializeAnnotationsToSvg(offsetX = 0, offsetY = 0) {
 
 function annotationToSvg(annotation, offsetX, offsetY) {
   if (annotation.type === 'rect') {
-    const rectSvg = [`<rect x="${annotation.x - offsetX}" y="${annotation.y - offsetY}" width="${annotation.width}" height="${annotation.height}" fill="rgba(239,68,68,0.12)" stroke="#ef4444" stroke-width="3" rx="8" ry="8" />`];
+    const rectSvg = [
+      `<rect x="${annotation.x - offsetX}" y="${annotation.y - offsetY}" width="${annotation.width}" height="${annotation.height}" fill="rgba(239,68,68,0.12)" stroke="#ef4444" stroke-width="3" rx="8" ry="8" />`,
+    ];
 
     if (annotation.label) {
-      const lines = String(annotation.label).split(/\r?\n/).slice(0, 4);
+      const lines = String(annotation.label).split(/\r?\n/);
       const x = annotation.x - offsetX + 10;
       const y = annotation.y - offsetY + 18;
-      rectSvg.push(`<text x="${x}" y="${y}" fill="#fee2e2" font-size="16" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">`);
+      rectSvg.push(
+        `<text x="${x}" y="${y}" fill="#fee2e2" font-size="16" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">`
+      );
       lines.forEach((line, index) => {
-        rectSvg.push(`<tspan x="${x}" dy="${index === 0 ? '0' : '1.2em'}">${escapeXml(line)}</tspan>`);
+        rectSvg.push(
+          `<tspan x="${x}" dy="${index === 0 ? '0' : '1.2em'}">${escapeXml(line)}</tspan>`
+        );
       });
       rectSvg.push('</text>');
     }
@@ -1438,11 +1789,51 @@ function annotationToSvg(annotation, offsetX, offsetY) {
   }
 
   if (annotation.type === 'arrow') {
-    return `<line x1="${annotation.x1 - offsetX}" y1="${annotation.y1 - offsetY}" x2="${annotation.x2 - offsetX}" y2="${annotation.y2 - offsetY}" stroke="#60a5fa" stroke-width="4" stroke-linecap="round" />`;
+    const geometry = getArrowHeadGeometry(annotation);
+    const lineEndX = geometry ? geometry.lineEndX : annotation.x2;
+    const lineEndY = geometry ? geometry.lineEndY : annotation.y2;
+    const parts = [
+      `<line x1="${annotation.x1 - offsetX}" y1="${annotation.y1 - offsetY}" x2="${lineEndX - offsetX}" y2="${lineEndY - offsetY}" stroke="#60a5fa" stroke-width="4" stroke-linecap="butt" />`,
+    ];
+
+    if (geometry) {
+      parts.push(
+        `<path d="M ${geometry.tipX - offsetX} ${geometry.tipY - offsetY} L ${geometry.leftX - offsetX} ${geometry.leftY - offsetY} L ${geometry.rightX - offsetX} ${geometry.rightY - offsetY} Z" fill="#60a5fa" />`
+      );
+    }
+
+    if (annotation.label) {
+      const labelX = (annotation.x1 + annotation.x2) / 2 - offsetX;
+      const labelY = (annotation.y1 + annotation.y2) / 2 - 10 - offsetY;
+      const lines = String(annotation.label).split(/\r?\n/);
+      parts.push(
+        `<text x="${labelX}" y="${labelY}" fill="#60a5fa" font-size="16" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" paint-order="stroke" stroke="rgba(255,255,255,0.92)" stroke-width="4" stroke-linejoin="round">`
+      );
+      lines.forEach((line, index) => {
+        parts.push(
+          `<tspan x="${labelX}" dy="${index === 0 ? '0' : '1.2em'}">${escapeXml(line)}</tspan>`
+        );
+      });
+      parts.push('</text>');
+    }
+
+    return parts.join('');
   }
 
   if (annotation.type === 'text') {
-    return `<text x="${annotation.x - offsetX}" y="${annotation.y - offsetY}" fill="#f97316" font-size="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">${escapeXml(annotation.text || '')}</text>`;
+    const lines = String(annotation.text || '').split(/\r?\n/);
+    const x = annotation.x - offsetX;
+    const y = annotation.y - offsetY;
+    const parts = [
+      `<text x="${x}" y="${y}" fill="#f97316" font-size="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">`,
+    ];
+    lines.forEach((line, index) => {
+      parts.push(
+        `<tspan x="${x}" dy="${index === 0 ? '0' : '1.2em'}">${escapeXml(line)}</tspan>`
+      );
+    });
+    parts.push('</text>');
+    return parts.join('');
   }
 
   return '';
@@ -1460,8 +1851,12 @@ async function buildAnnotatedImageDataUrl() {
   const context = canvas.getContext('2d');
   context.drawImage(img, 0, 0);
 
-  const scaleX = img.naturalWidth / (state.artifactMetrics ? state.artifactMetrics.width : img.naturalWidth);
-  const scaleY = img.naturalHeight / (state.artifactMetrics ? state.artifactMetrics.height : img.naturalHeight);
+  const scaleX =
+    img.naturalWidth /
+    (state.artifactMetrics ? state.artifactMetrics.width : img.naturalWidth);
+  const scaleY =
+    img.naturalHeight /
+    (state.artifactMetrics ? state.artifactMetrics.height : img.naturalHeight);
 
   state.annotations.forEach((annotation) => {
     drawAnnotationOnCanvas(context, annotation, scaleX, scaleY);
@@ -1477,15 +1872,29 @@ function drawAnnotationOnCanvas(context, annotation, scaleX, scaleY) {
     context.strokeStyle = '#ef4444';
     context.lineWidth = 5;
     context.fillStyle = 'rgba(239,68,68,0.12)';
-    context.fillRect(annotation.x * scaleX, annotation.y * scaleY, annotation.width * scaleX, annotation.height * scaleY);
-    context.strokeRect(annotation.x * scaleX, annotation.y * scaleY, annotation.width * scaleX, annotation.height * scaleY);
+    context.fillRect(
+      annotation.x * scaleX,
+      annotation.y * scaleY,
+      annotation.width * scaleX,
+      annotation.height * scaleY
+    );
+    context.strokeRect(
+      annotation.x * scaleX,
+      annotation.y * scaleY,
+      annotation.width * scaleX,
+      annotation.height * scaleY
+    );
 
     if (annotation.label) {
       context.fillStyle = '#fee2e2';
       context.font = `${16 * Math.max(scaleY, 1)}px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
-      const lines = String(annotation.label).split(/\r?\n/).slice(0, 4);
+      const lines = String(annotation.label).split(/\r?\n/);
       lines.forEach((line, index) => {
-        context.fillText(line, (annotation.x + 10) * scaleX, (annotation.y + 18 + index * 20) * scaleY);
+        context.fillText(
+          line,
+          (annotation.x + 10) * scaleX,
+          (annotation.y + 18 + index * 20) * scaleY
+        );
       });
     }
 
@@ -1494,12 +1903,45 @@ function drawAnnotationOnCanvas(context, annotation, scaleX, scaleY) {
   }
 
   if (annotation.type === 'arrow') {
+    const geometry = getArrowHeadGeometry(annotation);
     context.strokeStyle = '#60a5fa';
     context.lineWidth = 6;
+    context.lineCap = 'butt';
     context.beginPath();
     context.moveTo(annotation.x1 * scaleX, annotation.y1 * scaleY);
-    context.lineTo(annotation.x2 * scaleX, annotation.y2 * scaleY);
+    context.lineTo(
+      (geometry ? geometry.lineEndX : annotation.x2) * scaleX,
+      (geometry ? geometry.lineEndY : annotation.y2) * scaleY
+    );
     context.stroke();
+
+    if (geometry) {
+      context.fillStyle = '#60a5fa';
+      context.beginPath();
+      context.moveTo(geometry.tipX * scaleX, geometry.tipY * scaleY);
+      context.lineTo(geometry.leftX * scaleX, geometry.leftY * scaleY);
+      context.lineTo(geometry.rightX * scaleX, geometry.rightY * scaleY);
+      context.closePath();
+      context.fill();
+    }
+
+    if (annotation.label) {
+      context.fillStyle = '#60a5fa';
+      context.strokeStyle = 'rgba(255,255,255,0.92)';
+      context.lineWidth = 4;
+      context.lineJoin = 'round';
+      context.paintOrder = 'stroke';
+      context.font = `${16 * Math.max(scaleY, 1)}px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
+      const lines = String(annotation.label).split(/\r?\n/);
+      const x = ((annotation.x1 + annotation.x2) / 2) * scaleX;
+      const y = ((annotation.y1 + annotation.y2) / 2 - 10) * scaleY;
+      lines.forEach((line, index) => {
+        const lineY = y + index * 20 * scaleY;
+        context.strokeText(line, x, lineY);
+        context.fillText(line, x, lineY);
+      });
+    }
+
     context.restore();
     return;
   }
@@ -1507,7 +1949,14 @@ function drawAnnotationOnCanvas(context, annotation, scaleX, scaleY) {
   if (annotation.type === 'text') {
     context.fillStyle = '#f97316';
     context.font = `${24 * scaleY}px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
-    context.fillText(annotation.text || '', annotation.x * scaleX, annotation.y * scaleY);
+    const lines = String(annotation.text || '').split(/\r?\n/);
+    lines.forEach((line, index) => {
+      context.fillText(
+        line,
+        annotation.x * scaleX,
+        (annotation.y + index * 28) * scaleY
+      );
+    });
   }
 
   context.restore();
@@ -1548,18 +1997,24 @@ function onKeyDown(event) {
   }
 
   if (event.key === '1') {
-    state.tool = 'rect';
+    state.tool = 'select';
     updateToolButtons();
     updateStatus();
   }
 
   if (event.key === '2') {
-    state.tool = 'arrow';
+    state.tool = 'rect';
     updateToolButtons();
     updateStatus();
   }
 
   if (event.key === '3') {
+    state.tool = 'arrow';
+    updateToolButtons();
+    updateStatus();
+  }
+
+  if (event.key === '4') {
     state.tool = 'text';
     updateToolButtons();
     updateStatus();
@@ -1619,11 +2074,15 @@ function onViewerWheel(event) {
   const zoomStep = isTrackpadLike ? TRACKPAD_ZOOM_STEP : WHEEL_ZOOM_STEP * 0.01;
   const delta = event.deltaY * -zoomStep;
 
-  setZoom(state.zoom + delta, { anchorX: event.clientX, anchorY: event.clientY });
+  setZoom(state.zoom + delta, {
+    anchorX: event.clientX,
+    anchorY: event.clientY,
+  });
 }
 
 function setZoom(nextZoom, options) {
-  const clamped = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextZoom));
+  const minZoom = getMinZoom();
+  const clamped = Math.min(MAX_ZOOM, Math.max(minZoom, nextZoom));
   const previous = state.zoom;
   state.zoom = clamped;
   applyZoom(false, previous, options);
@@ -1638,7 +2097,11 @@ function applyZoom(skipAnchorAdjust, previousZoom = state.zoom, options = {}) {
   let relativeX = null;
   let relativeY = null;
 
-  if (!skipAnchorAdjust && Number.isFinite(anchorX) && Number.isFinite(anchorY)) {
+  if (
+    !skipAnchorAdjust &&
+    Number.isFinite(anchorX) &&
+    Number.isFinite(anchorY)
+  ) {
     const rect = els.viewer.getBoundingClientRect();
     relativeX = anchorX - rect.left + els.viewer.scrollLeft;
     relativeY = anchorY - rect.top + els.viewer.scrollTop;
@@ -1647,10 +2110,19 @@ function applyZoom(skipAnchorAdjust, previousZoom = state.zoom, options = {}) {
   els.viewerStage.style.transform = `scale(${state.zoom})`;
   els.viewerStage.style.transformOrigin = 'top left';
 
-  if (!skipAnchorAdjust && relativeX !== null && relativeY !== null && previousZoom) {
+  if (
+    !skipAnchorAdjust &&
+    relativeX !== null &&
+    relativeY !== null &&
+    previousZoom
+  ) {
     const scaleRatio = state.zoom / previousZoom;
-    els.viewer.scrollLeft = relativeX * scaleRatio - (anchorX - els.viewer.getBoundingClientRect().left);
-    els.viewer.scrollTop = relativeY * scaleRatio - (anchorY - els.viewer.getBoundingClientRect().top);
+    els.viewer.scrollLeft =
+      relativeX * scaleRatio -
+      (anchorX - els.viewer.getBoundingClientRect().left);
+    els.viewer.scrollTop =
+      relativeY * scaleRatio -
+      (anchorY - els.viewer.getBoundingClientRect().top);
   }
 
   updateStatus();
@@ -1715,6 +2187,63 @@ function findAnnotationId(target) {
   return group ? group.dataset.annotationId : null;
 }
 
+function normalizeBounds(start, end) {
+  return {
+    x: Math.min(start.x, end.x),
+    y: Math.min(start.y, end.y),
+    width: Math.abs(end.x - start.x),
+    height: Math.abs(end.y - start.y),
+  };
+}
+
+function annotationIntersectsBounds(annotation, bounds) {
+  const annotationBounds = getAnnotationBounds(annotation);
+  if (!annotationBounds) {
+    return false;
+  }
+
+  return !(
+    annotationBounds.x > bounds.x + bounds.width ||
+    annotationBounds.x + annotationBounds.width < bounds.x ||
+    annotationBounds.y > bounds.y + bounds.height ||
+    annotationBounds.y + annotationBounds.height < bounds.y
+  );
+}
+
+function getAnnotationBounds(annotation) {
+  if (annotation.type === 'rect') {
+    return {
+      x: annotation.x,
+      y: annotation.y,
+      width: annotation.width,
+      height: annotation.height,
+    };
+  }
+
+  if (annotation.type === 'arrow') {
+    return {
+      x: Math.min(annotation.x1, annotation.x2),
+      y: Math.min(annotation.y1, annotation.y2),
+      width: Math.abs(annotation.x2 - annotation.x1),
+      height: Math.abs(annotation.y2 - annotation.y1),
+    };
+  }
+
+  if (annotation.type === 'text') {
+    return {
+      x: annotation.x,
+      y: annotation.y - 24,
+      width: 180,
+      height: Math.max(
+        28,
+        String(annotation.text || '').split(/\r?\n/).length * 28
+      ),
+    };
+  }
+
+  return null;
+}
+
 function findHandleInfo(target) {
   if (!target || !target.dataset || !target.dataset.handle) {
     return null;
@@ -1735,11 +2264,33 @@ function generateAnnotationId() {
 }
 
 function getSceneWidth() {
-  return Math.round(els.viewerStage ? els.viewerStage.scrollWidth || els.viewerStage.clientWidth || 0 : 0);
+  return Math.round(
+    els.viewerStage
+      ? els.viewerStage.scrollWidth || els.viewerStage.clientWidth || 0
+      : 0
+  );
 }
 
 function getSceneHeight() {
-  return Math.round(els.viewerStage ? els.viewerStage.scrollHeight || els.viewerStage.clientHeight || 0 : 0);
+  return Math.round(
+    els.viewerStage
+      ? els.viewerStage.scrollHeight || els.viewerStage.clientHeight || 0
+      : 0
+  );
+}
+
+function getMinZoom() {
+  if (!els.viewer || !state.artifactMetrics || !state.artifactMetrics.width) {
+    return MIN_ZOOM;
+  }
+
+  const viewerRect = els.viewer.getBoundingClientRect();
+  if (!viewerRect.width) {
+    return MIN_ZOOM;
+  }
+
+  const fitWidthZoom = viewerRect.width / state.artifactMetrics.width;
+  return Math.max(0.05, Math.min(1, fitWidthZoom));
 }
 
 function toFileUrl(filePath) {
@@ -1779,7 +2330,9 @@ async function refreshDaemonStatus() {
     const health = await window.reviewApp.getHealth();
     state.daemonConnected = Boolean(health && health.ok);
     state.daemonError = '';
-    state.queuedCount = Number(health && health.queuedCount ? health.queuedCount : 0);
+    state.queuedCount = Number(
+      health && health.queuedCount ? health.queuedCount : 0
+    );
     state.activeRequestId = health ? health.activeRequestId || null : null;
     state.uiRunning = Boolean(health && health.uiRunning);
   } catch (error) {
