@@ -247,6 +247,20 @@ textarea {
   flex: 1;
 }
 
+.toolbar-artifact-picker {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.toolbar-artifact-picker .artifact-picker-anchor {
+  position: relative;
+}
+
+.toolbar-artifact-picker-toggle {
+  width: 42px;
+  height: 42px;
+}
+
 .zoom-controls {
   display: flex;
   align-items: center;
@@ -397,6 +411,44 @@ textarea {
 .topbar-icon-btn {
   width: 42px;
   height: 42px;
+}
+
+.artifact-picker-menu {
+  top: calc(100% + 4px);
+  left: 50%;
+  right: auto;
+  width: 320px;
+  min-width: 0;
+  max-width: min(320px, calc(100vw - 48px));
+  padding: 10px;
+  box-sizing: border-box;
+  transform: translateX(-50%);
+}
+
+.generated-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: min(calc(6 * 56px + 5 * 8px), calc(100vh - 220px));
+  overflow-y: auto;
+  padding-right: 2px;
+  scrollbar-gutter: stable;
+}
+
+@media (max-width: 900px) {
+  .toolbar {
+    gap: 12px;
+  }
+
+  .zoom-controls {
+    margin-left: auto;
+  }
+
+  .artifact-picker-menu {
+    left: 0;
+    width: min(320px, calc(100vw - 48px));
+    transform: none;
+  }
 }
 
 .tool-btn-danger {
