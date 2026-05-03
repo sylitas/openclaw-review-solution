@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import SlideUp from './SlideUp';
+import React from 'react';
 import {
   ArrowUpRight,
   BookOpen,
   Check,
   ChevronDown,
+  ChevronUp,
   Copy,
   FileCode2,
   Info,
@@ -329,6 +329,10 @@ export function AppShell() {
             <div id="viewer-stage" className="viewer-stage">
               <div id="artifact-host" className="artifact-host" />
               <svg id="annotation-layer" className="annotation-layer" />
+
+              <div id="no-active-overlay" className="no-active-overlay hidden">
+                <div className="no-active-card">No active review request</div>
+              </div>
             </div>
             <div id="inline-editor" className="inline-editor hidden" role="dialog" aria-modal="false">
               <div id="inline-editor-backdrop" className="hidden" aria-hidden="true" />
@@ -349,66 +353,82 @@ export function AppShell() {
               </div>
             </div>
           </div>
-        </section>
 
-        <aside className="review-panel">
-          <section id="annotation-inspector" className="hidden" aria-hidden="true">
-            <div className="inspector-title">Annotation inspector</div>
-            <div id="inspector-empty" className="inspector-empty">
-              Select an annotation to inspect its details.
-            </div>
-            <div id="inspector-content" className="inspector-content hidden">
-              <div id="inspector-type" className="inspector-type">Annotation</div>
-              <label className="field field-grow">
-                <span id="inspector-label">Annotation text</span>
+          <div className="floating-review" aria-label="Review actions">
+            <button
+              id="review-note-toggle"
+              className="tool-btn icon-btn floating-note-toggle"
+              type="button"
+              aria-label="Toggle review note"
+              aria-expanded="false"
+              aria-controls="review-note-panel"
+            >
+              <ChevronUp aria-hidden="true" />
+            </button>
+
+            <div id="review-note-panel" className="floating-review-note hidden">
+              <label className="field">
+                <span>Review note</span>
                 <textarea
-                  id="annotation-meta-input"
+                  id="message"
                   rows="5"
-                  placeholder="Double click annotation to edit, or update here..."
+                  placeholder="Write your decision here..."
                 />
               </label>
             </div>
-          </section>
 
-          <section className="inspector-card review-actions-card">
-            <div className="inspector-title">Review action</div>
-            <label className="field">
-              <span>Review note</span>
-              <textarea
-                id="message"
-                rows="6"
-                placeholder="Write your decision or change request here..."
-              />
-            </label>
-
-            <div className="actions">
+            <div className="floating-review-actions">
               <button
                 id="approve"
-                className="tool-btn icon-btn action-icon-btn action-success"
+                className="tool-btn floating-action-btn floating-action-approve"
                 type="button"
                 aria-label="Approve"
               >
                 <Check aria-hidden="true" />
-              </button>
-              <button
-                id="changes"
-                className="tool-btn icon-btn action-icon-btn action-primary"
-                type="button"
-                aria-label="Request changes"
-              >
-                <PencilLine aria-hidden="true" />
+                <span>Approve</span>
               </button>
               <button
                 id="cancel"
-                className="tool-btn icon-btn action-icon-btn action-secondary"
+                className="tool-btn floating-action-btn floating-action-cancel"
                 type="button"
                 aria-label="Cancel"
               >
                 <X aria-hidden="true" />
+                <span>Cancel</span>
               </button>
             </div>
-          </section>
-        </aside>
+          </div>
+
+          <div className="technical-dom hidden" aria-hidden="true">
+            <section id="annotation-inspector" className="hidden" aria-hidden="true">
+              <div className="inspector-title">Annotation inspector</div>
+              <div id="inspector-empty" className="inspector-empty">
+                Select an annotation to inspect its details.
+              </div>
+              <div id="inspector-content" className="inspector-content hidden">
+                <div id="inspector-type" className="inspector-type">Annotation</div>
+                <label className="field field-grow">
+                  <span id="inspector-label">Annotation text</span>
+                  <textarea
+                    id="annotation-meta-input"
+                    rows="5"
+                    placeholder="Double click annotation to edit, or update here..."
+                  />
+                </label>
+              </div>
+            </section>
+
+            <button
+              id="changes"
+              className="hidden"
+              type="button"
+              aria-label="Request changes"
+              tabIndex={-1}
+            >
+              <PencilLine aria-hidden="true" />
+            </button>
+          </div>
+        </section>
       </main>
     </div>
   );

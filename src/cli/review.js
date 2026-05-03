@@ -125,11 +125,6 @@ async function submitAndAwait(request) {
     const result = await waitForCompletion(requestId);
     console.log(JSON.stringify(result, null, 2));
 
-    if (result.status === 'cancelled') {
-      process.exit(3);
-      return;
-    }
-
     if (result.status === 'failed') {
       process.exit(1);
       return;

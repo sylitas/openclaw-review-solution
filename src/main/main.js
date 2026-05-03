@@ -148,21 +148,29 @@ if (!hasLock) {
 
   ipcMain.handle('review:submit-result', async (_event, payload) => {
     debugLog('ipc', 'review:submit-result', {
+      requestId: payload ? payload.requestId || null : null,
       status: payload ? payload.status : null,
       annotationCount: payload && Array.isArray(payload.annotations) ? payload.annotations.length : 0,
     });
 
     const currentRequest = await getCurrentSessionRequest();
+    const requestId = currentRequest ? currentRequest.id || null : null;
+
     debugLog('ipc', 'review:submit-result:active-request', {
-      requestId: currentRequest ? currentRequest.id || null : null,
+      activeRequestId: requestId,
+      targetRequestId: payload ? payload.requestId || null : null,
     });
-    if (!currentRequest || !currentRequest.id) {
+    if (!requestId) {
       throw new Error('No active session request found.');
+    }
+
+    if (payload && payload.requestId && payload.requestId !== requestId) {
+      throw new Error('Selected artifact does not match the active review request.');
     }
 
     const response = await requestJson(
       'POST',
-      `/session/${encodeURIComponent(currentRequest.id)}/result`,
+      `/session/${encodeURIComponent(requestId)}/result`,
       payload || {}
     );
 
@@ -175,7 +183,7 @@ if (!hasLock) {
 
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('review:result-submitted', {
-        requestId: currentRequest.id,
+        requestId,
         status: payload ? payload.status || null : null,
         nextRequestId: nextRequest ? nextRequest.id || null : null,
       });

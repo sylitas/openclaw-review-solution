@@ -66,6 +66,9 @@ function captureElements() {
   els.inspectorType = document.getElementById('inspector-type');
   els.inspectorLabel = document.getElementById('inspector-label');
   els.annotationMetaInput = document.getElementById('annotation-meta-input');
+  els.reviewNoteToggle = document.getElementById('review-note-toggle');
+  els.reviewNotePanel = document.getElementById('review-note-panel');
+  els.noActiveOverlay = document.getElementById('no-active-overlay');
   els.inlineEditor = document.getElementById('inline-editor');
   els.inlineEditorBackdrop = document.getElementById('inline-editor-backdrop');
   els.inlineEditorClose = document.getElementById('inline-editor-close');
@@ -93,7 +96,6 @@ function hasRequiredElements() {
     els.annotationLayer &&
     els.message &&
     els.approve &&
-    els.changes &&
     els.cancel
   );
 }
@@ -224,9 +226,13 @@ function resetSessionState() {
   state.statusPopoverOpen = false;
   state.helpPopoverOpen = false;
   state.drawToolMenuOpen = false;
-  els.message.value = '';
+  state.reviewNoteOpen = false;
+  if (els.message) {
+    els.message.value = '';
+  }
   updateTopbarPopovers();
   updateToolMenu();
+  updateReviewNotePanel();
 }
 
 function refreshVendorUi() {
@@ -335,10 +341,15 @@ function renderRequest(request) {
     els.prompt.textContent =
       'The review window is idle. Submit a request from the CLI and it will appear here automatically.';
     els.artifactType.textContent = 'IDLE';
-    renderEmptyState('No active review request right now.');
+    resetArtifactHost();
+    state.artifactMetrics = null;
+    setNoActiveOverlay(true);
+    updateStatus();
     refreshVendorUi();
     return;
   }
+
+  setNoActiveOverlay(false);
 
   els.title.textContent = request.title || 'Untitled review';
   els.prompt.textContent = request.prompt || 'No review prompt provided.';
@@ -510,6 +521,7 @@ function renderMermaidError(error) {
 }
 
 function renderEmptyState(message) {
+  setNoActiveOverlay(false);
   setArtifactMode('default');
   resetArtifactHost();
   state.artifactMetrics = null;
@@ -527,6 +539,14 @@ function resetArtifactHost() {
   els.artifactHost.innerHTML = '';
 }
 
+function setNoActiveOverlay(visible) {
+  if (!els.noActiveOverlay) {
+    return;
+  }
+
+  els.noActiveOverlay.classList.toggle('hidden', !visible);
+}
+
 function setArtifactMode(mode) {
   const isDiagram = mode === 'diagram';
   const isImage = mode === 'image';
@@ -538,17 +558,32 @@ function setArtifactMode(mode) {
 }
 
 function bindActions() {
-  els.approve.addEventListener('click', function onApprove() {
+  els.approve.addEventListener('click', function onApprove(event) {
+    event.preventDefault();
+    event.stopPropagation();
     submit('approved');
   });
 
-  els.changes.addEventListener('click', function onRequestChanges() {
-    submit('changes_requested');
-  });
+  if (els.changes) {
+    els.changes.addEventListener('click', function onRequestChanges(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      submit('changes_requested');
+    });
+  }
 
-  els.cancel.addEventListener('click', function onCancel() {
+  els.cancel.addEventListener('click', function onCancel(event) {
+    event.preventDefault();
+    event.stopPropagation();
     submit('cancelled');
   });
+
+  if (els.reviewNoteToggle) {
+    els.reviewNoteToggle.addEventListener('click', function onReviewNoteToggle() {
+      state.reviewNoteOpen = !state.reviewNoteOpen;
+      updateReviewNotePanel();
+    });
+  }
 
   els.undo.addEventListener('click', function onUndo() {
     undoLastAnnotation();
@@ -1554,6 +1589,62 @@ function getAnnotationDisplayValue(annotation) {
   return annotation.type === 'text' ? annotation.text || '' : annotation.label || '';
 }
 
+function updateReviewNotePanel() {
+  if (els.reviewNotePanel) {
+    els.reviewNotePanel.classList.toggle('hidden', !state.reviewNoteOpen);
+  }
+
+  if (els.reviewNoteToggle) {
+    els.reviewNoteToggle.setAttribute(
+      'aria-expanded',
+      state.reviewNoteOpen ? 'true' : 'false'
+    );
+    els.reviewNoteToggle.classList.toggle('is-open', state.reviewNoteOpen);
+  }
+}
+
+function getViewingRequestId() {
+  if (currentRequest && currentRequest.id) {
+    return currentRequest.id;
+  }
+
+  if (
+    state.selectedGeneratedArtifact &&
+    state.selectedGeneratedArtifact.loaded &&
+    state.selectedGeneratedArtifact.loaded.requestId
+  ) {
+    return state.selectedGeneratedArtifact.loaded.requestId;
+  }
+
+  if (
+    state.selectedGeneratedArtifact &&
+    state.selectedGeneratedArtifact.request &&
+    state.selectedGeneratedArtifact.request.requestId
+  ) {
+    return state.selectedGeneratedArtifact.request.requestId;
+  }
+
+  return null;
+}
+
+function canSubmitCurrentView() {
+  return Boolean(currentRequest && currentRequest.id && getViewingRequestId() === currentRequest.id);
+}
+
+function updateReviewActions() {
+  const disabled = !canSubmitCurrentView() || state.isSubmitting;
+
+  if (els.approve) {
+    els.approve.disabled = disabled;
+    els.approve.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+  }
+
+  if (els.cancel) {
+    els.cancel.disabled = disabled;
+    els.cancel.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+  }
+}
+
 function updateStatus() {
   if (els.zoomLevel) {
     els.zoomLevel.textContent = `${Math.round(state.zoom * 100)}%`;
@@ -1619,6 +1710,8 @@ function updateStatus() {
       els.daemonMessage.textContent = 'Waiting for the next review request…';
     }
   }
+
+  updateReviewActions();
 }
 
 function openInlineEditor(annotationId) {
@@ -2011,13 +2104,18 @@ function createHandle(annotationId, handle, x, y) {
 }
 
 async function submit(status) {
+  const submissionRequestId = currentRequest && currentRequest.id ? currentRequest.id : null;
+
   debugTrace('submit:start', {
     status,
     hasRequest: Boolean(currentRequest),
+    submissionRequestId,
+    viewingRequestId: getViewingRequestId(),
+    canSubmitCurrentView: canSubmitCurrentView(),
     isSubmitting: state.isSubmitting,
   });
 
-  if (!currentRequest || state.isSubmitting) {
+  if (!submissionRequestId || !canSubmitCurrentView() || state.isSubmitting) {
     return;
   }
 
@@ -2028,8 +2126,9 @@ async function submit(status) {
     const exportPayload = await buildExportPayload();
 
     const result = await window.reviewApp.submitResult({
+      requestId: submissionRequestId,
       status,
-      message: els.message.value,
+      message: els.message ? els.message.value : '',
       annotations: state.annotations,
       coordinateSpace: buildCoordinateSpace(),
       exportPayload,
@@ -2038,18 +2137,38 @@ async function submit(status) {
     await refreshGeneratedFiles();
 
     state.lastSubmittedResult = {
-      requestId: currentRequest.id,
+      requestId: submissionRequestId,
       status,
       nextRequestId:
         result && result.nextRequest ? result.nextRequest.id || null : null,
     };
     state.daemonError = `Review submitted: ${status}`;
-    updateStatus();
 
     if (result && result.nextRequest && result.nextRequest.id) {
-      window.location.reload();
+      currentRequest = result.nextRequest;
+      resetSessionState();
+      renderRequest(currentRequest);
+      updateStatus();
+      await refreshGeneratedFiles();
       return;
     }
+
+    currentRequest = null;
+    resetSessionState();
+    renderRequest(null);
+    state.lastSubmittedResult = {
+      requestId: submissionRequestId,
+      status,
+      nextRequestId: null,
+    };
+    updateStatus();
+
+    if (window.reviewApp && typeof window.reviewApp.closeWindow === 'function') {
+      window.setTimeout(() => {
+        window.reviewApp.closeWindow().catch(() => {});
+      }, 120);
+    }
+    return;
   } catch (error) {
     state.isSubmitting = false;
     state.daemonConnected = false;

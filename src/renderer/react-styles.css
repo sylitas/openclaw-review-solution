@@ -211,16 +211,13 @@ textarea {
 }
 
 .content {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
-  gap: 18px;
+  display: block;
   flex: 1;
   min-height: 0;
-  align-items: stretch;
 }
 
-.viewer-panel,
-.review-panel {
+.viewer-panel {
+  position: relative;
   min-height: 0;
   height: 100%;
   border: 1px solid var(--border);
@@ -480,6 +477,7 @@ textarea {
 .viewer-stage {
   position: relative;
   display: flex;
+  min-height: 480px;
   align-items: flex-start;
   justify-content: center;
   min-height: 100%;
@@ -502,13 +500,8 @@ textarea {
   overflow: visible;
 }
 
-.review-panel {
-  display: grid;
-  grid-template-rows: 1fr auto;
-  align-self: stretch;
-  padding: 18px;
-  gap: 18px;
-  overflow: visible;
+.technical-dom {
+  display: none;
 }
 
 .inspector-card {
@@ -581,56 +574,109 @@ textarea:focus {
   z-index: 10;
 }
 
-.actions {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+.floating-review {
+  --floating-review-width: 374px;
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 12px;
-  overflow: visible;
-  position: relative;
-  z-index: 20;
+  z-index: 40;
+  pointer-events: auto;
 }
 
-.actions .tooltip-btn {
-  position: relative;
-  z-index: 30;
+.floating-note-toggle {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  color: rgba(226, 232, 240, 0.88);
+  border-radius: 999px;
+  box-shadow: none;
 }
 
-.actions .tooltip-btn::after {
-  z-index: 9999;
+.floating-note-toggle:hover,
+.floating-note-toggle:focus-visible,
+.floating-note-toggle[aria-expanded='true'] {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: #fff;
+  transform: none;
 }
 
-.action-icon-btn {
-  width: 100%;
-  height: 48px;
-  border-radius: 16px;
+.floating-note-toggle svg {
+  width: 20px;
+  height: 20px;
+  transition: transform 160ms ease;
 }
 
-.action-success {
+.floating-note-toggle.is-open svg {
+  transform: rotate(180deg);
+}
+
+.floating-review-note {
+  width: min(var(--floating-review-width), calc(100vw - 48px));
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: rgba(15, 23, 42, 0.96);
+  box-shadow: 0 24px 64px rgba(2, 6, 23, 0.55);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.floating-review-actions {
+  width: min(var(--floating-review-width), calc(100vw - 48px));
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.floating-action-btn {
+  height: 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 20px;
+  border-radius: 18px;
+  font-size: 15px;
+  font-weight: 700;
+  box-shadow: 0 18px 36px rgba(2, 6, 23, 0.45);
+}
+
+.floating-action-btn span {
+  line-height: 1;
+}
+
+.floating-action-btn:disabled,
+.floating-action-btn[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.floating-action-approve {
   color: #bbf7d0;
 }
 
-.action-primary {
-  color: #bfdbfe;
-}
-
-.action-secondary {
-  color: #e2e8f0;
-}
-
-.action-success:hover,
-.action-success:focus-visible {
+.floating-action-approve:hover,
+.floating-action-approve:focus-visible {
   border-color: rgba(34, 197, 94, 0.42);
   background: rgba(20, 83, 45, 0.48);
 }
 
-.action-primary:hover,
-.action-primary:focus-visible {
-  border-color: rgba(59, 130, 246, 0.42);
-  background: rgba(30, 64, 175, 0.42);
+.floating-action-cancel {
+  color: #e2e8f0;
 }
 
-.action-secondary:hover,
-.action-secondary:focus-visible {
+.floating-action-cancel:hover,
+.floating-action-cancel:focus-visible {
   border-color: rgba(148, 163, 184, 0.32);
   background: rgba(51, 65, 85, 0.58);
 }
@@ -645,14 +691,38 @@ textarea:focus {
   color: var(--muted);
 }
 
-@media (max-width: 1180px) {
-  .content {
-    grid-template-columns: 1fr;
+@media (max-width: 900px) {
+  .floating-review {
+    bottom: 18px;
+    width: calc(100% - 24px);
   }
 
-  .review-panel {
-    min-height: 420px;
+  .floating-review-actions {
+    width: 100%;
+    grid-template-columns: 1fr 1fr;
   }
+
+  .floating-review-note {
+    width: 100%;
+  }
+}
+
+.no-active-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.no-active-card {
+  pointer-events: auto;
+  padding: 18px 22px;
+  border-radius: 14px;
+  background: rgba(15,23,42,0.7);
+  color: var(--muted);
+  border: 1px dashed rgba(148, 163, 184, 0.16);
 }
 
 /* Slide-up panel styles copied/adapted from download-youtube-playlist pattern */
