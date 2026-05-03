@@ -7,13 +7,13 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..');
-const stateFilePath = path.join(
+const appSupportDir = path.join(
   process.env.HOME || '',
   'Library',
   'Application Support',
-  'openclaw-review-solution',
-  'state.json'
+  'openclaw-review-solution'
 );
+const stateFilePath = path.join(appSupportDir, 'state.json');
 
 const REQUIRED_IDS = [
   'title',
@@ -311,16 +311,27 @@ async function main() {
 
   const requestResp = await httpJson('GET', `/requests/${requestId}`);
   check(requestResp.statusCode === 200 && requestResp.data.request && requestResp.data.request.status === 'approved', 'Stored request reaches terminal state', requestResp.data.request ? requestResp.data.request.status : 'none', failures);
+  check(Boolean(requestResp?.data?.request?.result), 'Daemon-visible terminal result available', requestResp?.data?.request?.result ? 'result present on request record' : 'missing result', failures);
 
-  const resultPath = path.join(process.env.HOME || '', 'Library', 'Application Support', 'openclaw-review-solution', 'results', `${requestId}.json`);
-  check(fs.existsSync(resultPath), 'Result file written', resultPath, failures);
+  const manifestPath = path.join(projectRoot, 'tmp', 'manifest.json');
+  const manifest = fs.existsSync(manifestPath)
+    ? JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+    : null;
+  const manifestArtifact = manifest && Array.isArray(manifest.artifacts)
+    ? manifest.artifacts.find((artifact) => artifact && artifact.requestId === requestId)
+    : null;
+
+  check(Boolean(manifest && manifest.schemaVersion === '2.0'), 'Artifact manifest upgraded to v2', manifest ? `schema=${manifest.schemaVersion}` : 'missing manifest', failures);
+  check(Boolean(manifest && Array.isArray(manifest.artifacts) && !Object.prototype.hasOwnProperty.call(manifest, 'requests')), 'Artifact manifest uses flat schema', manifest ? Object.keys(manifest).join(', ') : 'missing manifest', failures);
+  check(Boolean(manifestArtifact), 'Manifest contains mermaid artifact row', manifestArtifact ? manifestArtifact.path : 'missing artifact row', failures);
+  check(Boolean(manifestArtifact && typeof manifestArtifact.path === 'string' && manifestArtifact.path.includes(`${path.sep}tmp${path.sep}.artifact${path.sep}`)), 'Artifact stored under tmp/.artifact', manifestArtifact ? manifestArtifact.path : 'missing artifact path', failures);
+  check(Boolean(manifestArtifact && fs.existsSync(manifestArtifact.path)), 'Artifact file written', manifestArtifact ? manifestArtifact.path : 'missing artifact path', failures);
+
+  const appSupportResultPath = path.join(appSupportDir, 'results', `${requestId}.json`);
+  check(!fs.existsSync(appSupportResultPath), 'App-support result file not persisted', appSupportResultPath, failures);
   check(fs.existsSync(stateFilePath), 'State file written', stateFilePath, failures);
 
-  if (!daemon.reusedExisting) {
-    daemon.child.kill('SIGTERM');
-  } else {
-    daemon.child.kill('SIGTERM');
-  }
+  daemon.child.kill('SIGTERM');
 
   console.log('---');
   if (failures.length > 0) {

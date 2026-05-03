@@ -4,191 +4,179 @@ const fs = require('fs');
 const path = require('path');
 const {
   ensureDir,
-  getRequestTmpDir,
-  getTmpDir,
-  getGeneratedFilesManifestPath,
+  getArtifactManifestPath,
+  getGeneratedArtifactsDir,
 } = require('./paths');
 
+const MANIFEST_SCHEMA_VERSION = '2.0';
+
 function readManifest() {
-  const manifestPath = getGeneratedFilesManifestPath();
+  const manifestPath = getArtifactManifestPath();
   if (!fs.existsSync(manifestPath)) {
-    return { schemaVersion: '1.0', requests: [] };
+    return {
+      schemaVersion: MANIFEST_SCHEMA_VERSION,
+      artifacts: [],
+    };
   }
 
   try {
     const raw = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    return {
-      schemaVersion: raw && raw.schemaVersion ? raw.schemaVersion : '1.0',
-      requests: Array.isArray(raw && raw.requests) ? raw.requests : [],
-    };
+    return normalizeManifest(raw);
   } catch {
-    return { schemaVersion: '1.0', requests: [] };
+    return {
+      schemaVersion: MANIFEST_SCHEMA_VERSION,
+      artifacts: [],
+    };
   }
+}
+
+function normalizeManifest(raw) {
+  if (
+    raw &&
+    raw.schemaVersion === MANIFEST_SCHEMA_VERSION &&
+    Array.isArray(raw.artifacts)
+  ) {
+    return {
+      schemaVersion: MANIFEST_SCHEMA_VERSION,
+      artifacts: raw.artifacts
+        .map(normalizeArtifactRow)
+        .filter(Boolean),
+    };
+  }
+
+  if (raw && raw.schemaVersion === '1.0' && Array.isArray(raw.requests)) {
+    return {
+      schemaVersion: MANIFEST_SCHEMA_VERSION,
+      artifacts: raw.requests
+        .flatMap((request) => normalizeV1Request(request))
+        .filter(Boolean),
+    };
+  }
+
+  return {
+    schemaVersion: MANIFEST_SCHEMA_VERSION,
+    artifacts: [],
+  };
+}
+
+function normalizeV1Request(request) {
+  if (!request || !Array.isArray(request.files)) {
+    return [];
+  }
+
+  return request.files
+    .filter((file) => {
+      if (!file || typeof file.path !== 'string') {
+        return false;
+      }
+
+      if (request.artifactType && request.artifactType !== 'mermaid') {
+        return false;
+      }
+
+      return file.kind === 'artifact' && path.extname(file.path).toLowerCase() === '.mmd';
+    })
+    .map((file) =>
+      normalizeArtifactRow({
+        requestId: request.requestId || null,
+        title: request.title || null,
+        artifactType: 'mermaid',
+        path: path.resolve(file.path),
+        createdAt: file.createdAt || request.createdAt || new Date().toISOString(),
+      })
+    )
+    .filter(Boolean);
+}
+
+function normalizeArtifactRow(row) {
+  if (!row || typeof row.path !== 'string') {
+    return null;
+  }
+
+  return {
+    requestId: row.requestId || null,
+    title: row.title || null,
+    artifactType: row.artifactType || 'mermaid',
+    path: path.resolve(row.path),
+    createdAt: row.createdAt || new Date().toISOString(),
+  };
 }
 
 function writeManifest(manifest) {
-  ensureDir(getTmpDir());
-  fs.writeFileSync(getGeneratedFilesManifestPath(), JSON.stringify(manifest, null, 2), 'utf8');
+  const normalized = normalizeManifest(manifest);
+  const manifestPath = getArtifactManifestPath();
+  ensureDir(path.dirname(manifestPath));
+  fs.writeFileSync(manifestPath, JSON.stringify(normalized, null, 2), 'utf8');
+  return manifestPath;
 }
 
-function detectArtifactFileName(request) {
-  if (!request) {
-    return 'artifact.txt';
+function createUniqueArtifactPath(createdAt) {
+  const dir = getGeneratedArtifactsDir();
+  const timestampMs = Number.isFinite(Date.parse(createdAt || ''))
+    ? Date.parse(createdAt)
+    : Date.now();
+  const baseName = String(timestampMs);
+  let candidate = path.join(dir, `${baseName}.mmd`);
+  let suffix = 1;
+
+  while (fs.existsSync(candidate)) {
+    candidate = path.join(dir, `${baseName}-${suffix}.mmd`);
+    suffix += 1;
   }
 
-  if (request.artifactType === 'mermaid') {
-    return 'artifact.mmd';
-  }
-
-  if (request.artifactType === 'html') {
-    return 'artifact.html';
-  }
-
-  if (request.sourcePath) {
-    return path.basename(request.sourcePath);
-  }
-
-  return 'artifact.bin';
+  return candidate;
 }
 
-function ensureArtifactStored(request) {
-  if (!request || !request.id) {
-    return null;
+function registerGeneratedMermaidArtifact({ requestId, title, content, createdAt }) {
+  if (typeof content !== 'string') {
+    throw new Error('Mermaid content is required.');
   }
 
-  const requestDir = getRequestTmpDir(request.id);
-  const fileName = detectArtifactFileName(request);
-  const artifactPath = path.join(requestDir, fileName);
-
-  if (request.inlineContent != null) {
-    fs.writeFileSync(artifactPath, String(request.inlineContent), 'utf8');
-  } else if (request.sourcePath && fs.existsSync(request.sourcePath)) {
-    fs.copyFileSync(request.sourcePath, artifactPath);
-  } else {
-    return null;
-  }
-
-  return artifactPath;
-}
-
-function upsertManifestRequest(request, patch = {}) {
-  if (!request || !request.id) {
-    return null;
-  }
+  const artifactPath = createUniqueArtifactPath(createdAt);
+  fs.writeFileSync(artifactPath, content, 'utf8');
 
   const manifest = readManifest();
-  const existing = manifest.requests.find((item) => item.requestId === request.id) || null;
-  const requestDir = getRequestTmpDir(request.id);
-  const base = existing || {
-    requestId: request.id,
-    title: request.title || null,
-    artifactType: request.artifactType || null,
-    createdAt: request.createdAt || new Date().toISOString(),
-    completedAt: null,
-    requestDir,
-    files: [],
-  };
+  const artifact = normalizeArtifactRow({
+    requestId: requestId || null,
+    title: title || null,
+    artifactType: 'mermaid',
+    path: artifactPath,
+    createdAt: createdAt || new Date().toISOString(),
+  });
 
-  const next = {
-    ...base,
-    ...patch,
-    requestId: request.id,
-    title: request.title || base.title || null,
-    artifactType: request.artifactType || base.artifactType || null,
-    createdAt: request.createdAt || base.createdAt || new Date().toISOString(),
-    requestDir,
-    files: Array.isArray(patch.files) ? patch.files : base.files,
-  };
+  manifest.artifacts.push(artifact);
+  writeManifest(manifest);
 
-  const nextRequests = manifest.requests.filter((item) => item.requestId !== request.id);
-  nextRequests.push(next);
-  nextRequests.sort(
-    (a, b) =>
-      Date.parse(b.completedAt || b.createdAt || 0) -
-      Date.parse(a.completedAt || a.createdAt || 0)
-  );
-
-  writeManifest({ schemaVersion: '1.0', requests: nextRequests });
-  return next;
+  return artifact;
 }
 
-function registerArtifactRequest(request) {
-  if (!request || !request.id) {
-    return null;
-  }
-
-  const artifactPath = ensureArtifactStored(request);
-  const files = artifactPath
-    ? [
-        {
-          name: path.basename(artifactPath),
-          kind: 'artifact',
-          path: artifactPath,
-          relativePath: path.relative(getTmpDir(), artifactPath),
-          createdAt: request.createdAt || new Date().toISOString(),
-        },
-      ]
-    : [];
-
-  return upsertManifestRequest(request, {
-    files,
-  });
-}
-
-function registerRequestOutputs(request, result, outputFiles = []) {
-  if (!request || !request.id) {
-    return null;
-  }
-
-  const manifest = readManifest();
-  const existing = manifest.requests.find((item) => item.requestId === request.id) || null;
-  const existingFiles = Array.isArray(existing && existing.files) ? existing.files : [];
-  const mergedFiles = [...existingFiles];
-
-  (Array.isArray(outputFiles) ? outputFiles : []).forEach((file) => {
-    if (!file || !file.path) {
-      return;
-    }
-
-    const normalized = {
-      name: file.name || path.basename(file.path),
-      kind: file.kind || 'file',
-      path: file.path,
-      relativePath: path.relative(getTmpDir(), file.path),
-      createdAt: file.createdAt || (result && result.reviewedAt) || new Date().toISOString(),
-    };
-
-    const index = mergedFiles.findIndex((item) => item.path === normalized.path);
-    if (index >= 0) {
-      mergedFiles[index] = normalized;
-    } else {
-      mergedFiles.push(normalized);
-    }
-  });
-
-  mergedFiles.sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0));
-
-  return upsertManifestRequest(request, {
-    completedAt: result && result.reviewedAt ? result.reviewedAt : null,
-    files: mergedFiles,
-  });
+function listGeneratedArtifacts() {
+  return readManifest().artifacts;
 }
 
 function listGeneratedRequests() {
-  const manifest = readManifest();
-  return manifest.requests
-    .slice()
-    .sort(
-      (a, b) =>
-        Date.parse(b.completedAt || b.createdAt || 0) -
-        Date.parse(a.completedAt || a.createdAt || 0)
-    );
+  return listGeneratedArtifacts().map((artifact) => ({
+    requestId: artifact.requestId,
+    title: artifact.title,
+    artifactType: artifact.artifactType || 'mermaid',
+    createdAt: artifact.createdAt,
+    completedAt: artifact.createdAt,
+    files: [
+      {
+        name: path.basename(artifact.path),
+        kind: 'artifact',
+        path: artifact.path,
+        createdAt: artifact.createdAt,
+      },
+    ],
+  }));
 }
 
 module.exports = {
-  readManifest,
-  writeManifest,
-  registerArtifactRequest,
-  registerRequestOutputs,
+  MANIFEST_SCHEMA_VERSION,
+  listGeneratedArtifacts,
   listGeneratedRequests,
+  readManifest,
+  registerGeneratedMermaidArtifact,
+  writeManifest,
 };

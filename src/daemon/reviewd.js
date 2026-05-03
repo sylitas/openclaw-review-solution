@@ -3,8 +3,6 @@
 const path = require('path');
 const http = require('http');
 const { DAEMON_HOST, DAEMON_PORT } = require('../shared/constants');
-const { saveResult } = require('../shared/result');
-const { registerArtifactRequest } = require('../shared/artifact-registry');
 const { createFailureResult, toPublicRecord } = require('./record-utils');
 const { createStateStore } = require('./state-store');
 const { createUiLauncher } = require('./ui-launcher');
@@ -88,7 +86,6 @@ const uiLauncher = createUiLauncher({
 });
 
 queue = createQueueManager({
-  saveResult,
   createFailureResult,
   stateStore,
   onActiveRequest() {
@@ -146,7 +143,6 @@ async function handleCreateRequest(req, res) {
     }
 
     const record = queue.enqueue(body);
-    registerArtifactRequest(record.request);
     sendJson(res, 202, { request: toPublicRecord(record) });
   } catch (error) {
     sendJson(res, 400, { error: error.message });

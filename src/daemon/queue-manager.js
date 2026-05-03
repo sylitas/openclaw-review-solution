@@ -1,27 +1,10 @@
 'use strict';
 
 const { buildResult, writeExports } = require('../shared/result');
-const { registerRequestOutputs } = require('../shared/artifact-registry');
-const { getRequestTmpDir } = require('../shared/paths');
+const { registerGeneratedMermaidArtifact } = require('../shared/artifact-registry');
 const { createRecord } = require('./record-utils');
 
-function createQueueManager({ saveResult, createFailureResult, stateStore, onActiveRequest }) {
-  function registerRequestResult(record, result, generatedFiles = []) {
-    if (!record || !result) {
-      return;
-    }
-
-    registerRequestOutputs(record.request, result, [
-      {
-        kind: 'result-json',
-        path: `${getRequestTmpDir(record.id)}/result.json`,
-        name: 'result.json',
-        createdAt: result.reviewedAt,
-      },
-      ...generatedFiles,
-    ]);
-  }
-
+function createQueueManager({ createFailureResult, stateStore, onActiveRequest }) {
   let activeRequest = null;
   let pendingQueue = [];
   const requests = new Map();
@@ -73,8 +56,6 @@ function createQueueManager({ saveResult, createFailureResult, stateStore, onAct
         hydrated.completedAt = new Date().toISOString();
         hydrated.error = 'Daemon restarted while request was active.';
         hydrated.result = createFailureResult(hydrated.request, hydrated.error);
-        saveResult(hydrated.id, hydrated.result);
-        registerRequestResult(hydrated, hydrated.result);
       }
 
       requests.set(hydrated.id, hydrated);
@@ -93,6 +74,23 @@ function createQueueManager({ saveResult, createFailureResult, stateStore, onAct
 
   function enqueue(request) {
     const record = createRecord(request);
+
+    if (
+      record.request.artifactType === 'mermaid' &&
+      typeof record.request.inlineContent === 'string'
+    ) {
+      try {
+        registerGeneratedMermaidArtifact({
+          requestId: record.id,
+          title: record.request.title || null,
+          content: record.request.inlineContent,
+          createdAt: record.createdAt,
+        });
+      } catch (error) {
+        console.error(`[reviewd] Failed to register artifact for ${record.id}: ${error.message}`);
+      }
+    }
+
     requests.set(record.id, record);
     pendingQueue.push(record);
     persistState();
@@ -105,11 +103,6 @@ function createQueueManager({ saveResult, createFailureResult, stateStore, onAct
     record.completedAt = new Date().toISOString();
     record.result = result || null;
     record.error = errorMessage || null;
-
-    if (result) {
-      saveResult(record.id, result);
-      registerRequestResult(record, result, options.generatedFiles || []);
-    }
 
     if (!options.skipPersist) {
       persistState();
@@ -128,10 +121,7 @@ function createQueueManager({ saveResult, createFailureResult, stateStore, onAct
     const result = buildResult(activeRequest.request, payload || {}, exportsInfo);
 
     const completedRequest = activeRequest;
-    finishRecord(completedRequest, result.status, result, null, {
-      skipPersist: true,
-      generatedFiles: (exportsInfo && exportsInfo.generatedFiles) || [],
-    });
+    finishRecord(completedRequest, result.status, result, null, { skipPersist: true });
     activeRequest = null;
     persistState();
     maybeStartNext();

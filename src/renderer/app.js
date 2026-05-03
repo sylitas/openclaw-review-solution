@@ -12,8 +12,10 @@ const MAX_ZOOM = 8;
 const ZOOM_STEP = 0.25;
 const WHEEL_ZOOM_STEP = 0.3;
 const TRACKPAD_ZOOM_STEP = 0.0035;
+const DRAG_START_THRESHOLD = 4;
 
 const els = {};
+const annotationNodeCache = new Map();
 
 function captureElements() {
   els.title = document.getElementById('title');
@@ -58,6 +60,12 @@ function captureElements() {
   els.artifactPickerCurrent = document.getElementById('artifact-picker-current');
   els.currentArtifactTitle = document.getElementById('current-artifact-title');
   els.currentArtifactMeta = document.getElementById('current-artifact-meta');
+  els.annotationInspector = document.getElementById('annotation-inspector');
+  els.inspectorEmpty = document.getElementById('inspector-empty');
+  els.inspectorContent = document.getElementById('inspector-content');
+  els.inspectorType = document.getElementById('inspector-type');
+  els.inspectorLabel = document.getElementById('inspector-label');
+  els.annotationMetaInput = document.getElementById('annotation-meta-input');
   els.inlineEditor = document.getElementById('inline-editor');
   els.inlineEditorBackdrop = document.getElementById('inline-editor-backdrop');
   els.inlineEditorClose = document.getElementById('inline-editor-close');
@@ -105,6 +113,7 @@ const state = {
   selectedAnnotationIds: [],
   newlyCreatedTextId: null,
   dragging: null,
+  pendingDrag: null,
   panning: null,
   spacePan: false,
   zoom: 1,
@@ -206,6 +215,7 @@ function resetSessionState() {
   state.selectedAnnotationIds = [];
   state.newlyCreatedTextId = null;
   state.dragging = null;
+  state.pendingDrag = null;
   state.panning = null;
   state.spacePan = false;
   state.zoom = 1;
@@ -580,6 +590,19 @@ function bindActions() {
     });
   }
 
+  if (els.annotationMetaInput) {
+    ['input', 'change'].forEach((eventName) => {
+      els.annotationMetaInput.addEventListener(eventName, function onAnnotationMetaInput() {
+        const annotation = getSelectedAnnotation();
+        if (!annotation || state.selectedAnnotationIds.length > 1) {
+          return;
+        }
+
+        applyAnnotationValue(annotation, els.annotationMetaInput.value);
+      });
+    });
+  }
+
   if (els.inlineEditorSave) {
     els.inlineEditorSave.addEventListener('click', function onInlineEditorSave() {
       saveInlineEditor();
@@ -684,11 +707,17 @@ function bindActions() {
   els.viewer.addEventListener('pointerup', onPointerUp);
   els.viewer.addEventListener('pointercancel', onPointerUp);
   els.viewer.addEventListener('pointerleave', onPointerUp);
+  els.viewer.addEventListener('scroll', onViewerScroll, { passive: true });
+  els.annotationLayer.addEventListener('click', onAnnotationLayerClick);
   els.annotationLayer.addEventListener('dblclick', onDoubleClick);
   els.viewer.addEventListener('wheel', onViewerWheel, { passive: false });
 }
 
 function onPointerDown(event) {
+  if (els.inlineEditor && els.inlineEditor.contains(event.target)) {
+    return;
+  }
+
   syncStageGeometry();
   syncArtifactMetrics();
 
@@ -729,12 +758,23 @@ function onPointerDown(event) {
   if (annotationId) {
     state.selectedAnnotationId = annotationId;
     state.selectedAnnotationIds = [annotationId];
+
+    if (event.detail >= 2) {
+      state.pendingDrag = null;
+      updateStatus();
+      updateInspector();
+      renderAnnotations();
+      openInlineEditor(annotationId);
+      return;
+    }
+
     const annotation = getSelectedAnnotation();
-    if (annotation && state.tool === 'select') {
-      startAnnotationDrag(annotation, event);
+    if (annotation) {
+      queueAnnotationDrag(annotation, event);
     }
     closeInlineEditor();
     updateStatus();
+    updateInspector();
     renderAnnotations();
     return;
   }
@@ -762,6 +802,10 @@ function onPointerMove(event) {
     return;
   }
 
+  if (state.pendingDrag) {
+    maybeStartPendingDrag(event);
+  }
+
   if (state.dragging) {
     continueDragging(event);
     return;
@@ -778,23 +822,25 @@ function onPointerMove(event) {
 
 function onPointerUp(event) {
   if (state.panning) {
-    if (
-      event &&
-      event.pointerId != null &&
-      els.viewer.releasePointerCapture &&
-      els.viewer.hasPointerCapture &&
-      els.viewer.hasPointerCapture(event.pointerId)
-    ) {
-      try {
-        els.viewer.releasePointerCapture(event.pointerId);
-      } catch {}
-    }
+    releaseViewerPointerCapture(event);
     state.panning = null;
     return;
   }
 
   if (state.dragging) {
+    releaseViewerPointerCapture(event);
     state.dragging = null;
+    updateStatus();
+    updateInspector();
+    renderAnnotations();
+    return;
+  }
+
+  if (state.pendingDrag) {
+    state.pendingDrag = null;
+    updateStatus();
+    updateInspector();
+    renderAnnotations();
     return;
   }
 
@@ -810,16 +856,48 @@ function onPointerUp(event) {
   finalizeDraft();
 }
 
+function onAnnotationLayerClick(event) {
+  if (event.detail < 2 || (els.inlineEditor && els.inlineEditor.contains(event.target))) {
+    return;
+  }
+
+  const annotationId = findAnnotationId(event.target);
+  if (!annotationId) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  state.pendingDrag = null;
+  state.selectedAnnotationId = annotationId;
+  state.selectedAnnotationIds = [annotationId];
+  updateStatus();
+  updateInspector();
+  renderAnnotations();
+  openInlineEditor(annotationId);
+}
+
 function onDoubleClick(event) {
+  if (els.inlineEditor && els.inlineEditor.contains(event.target)) {
+    return;
+  }
+
   const annotationId = findAnnotationId(event.target);
   if (annotationId) {
+    event.preventDefault();
+    event.stopPropagation();
+    state.pendingDrag = null;
     state.selectedAnnotationId = annotationId;
     state.selectedAnnotationIds = [annotationId];
     updateStatus();
+    updateInspector();
     renderAnnotations();
     openInlineEditor(annotationId);
     return;
   }
+
+  event.preventDefault();
+  event.stopPropagation();
 
   if (state.tool !== 'text' || !isWithinArtifact(event)) {
     return;
@@ -1025,18 +1103,62 @@ function draftToAnnotation(draft) {
   return null;
 }
 
-function startAnnotationDrag(annotation, event) {
-  const point = pointerToArtifactPoint(event);
+function queueAnnotationDrag(annotation, event) {
+  const stageRect = els.viewerStage.getBoundingClientRect();
+  const point = pointerToArtifactPoint(event, stageRect);
   if (!point) {
     return;
   }
 
-  state.dragging = {
-    mode: 'move',
+  state.pendingDrag = {
+    pointerId: event.pointerId,
     annotationId: annotation.id,
     pointerStart: point,
     annotationSnapshot: cloneAnnotation(annotation),
+    stageRect,
   };
+}
+
+function maybeStartPendingDrag(event) {
+  const pendingDrag = state.pendingDrag;
+  if (!pendingDrag) {
+    return;
+  }
+
+  if (
+    pendingDrag.pointerId != null &&
+    event.pointerId != null &&
+    pendingDrag.pointerId !== event.pointerId
+  ) {
+    return;
+  }
+
+  const point = pointerToArtifactPoint(event, pendingDrag.stageRect);
+  if (!point) {
+    return;
+  }
+
+  const dx = point.x - pendingDrag.pointerStart.x;
+  const dy = point.y - pendingDrag.pointerStart.y;
+  if (Math.hypot(dx, dy) < DRAG_START_THRESHOLD) {
+    return;
+  }
+
+  if (event.pointerId != null && els.viewer.setPointerCapture) {
+    try {
+      els.viewer.setPointerCapture(event.pointerId);
+    } catch {}
+  }
+
+  state.dragging = {
+    mode: 'move',
+    pointerId: event.pointerId,
+    annotationId: pendingDrag.annotationId,
+    pointerStart: pendingDrag.pointerStart,
+    annotationSnapshot: pendingDrag.annotationSnapshot,
+    stageRect: pendingDrag.stageRect,
+  };
+  state.pendingDrag = null;
 }
 
 function startHandleDragging(handleInfo, event) {
@@ -1047,53 +1169,66 @@ function startHandleDragging(handleInfo, event) {
     return;
   }
 
-  const point = pointerToArtifactPoint(event);
+  const stageRect = els.viewerStage.getBoundingClientRect();
+  const point = pointerToArtifactPoint(event, stageRect);
   if (!point) {
     return;
   }
 
+  if (event.pointerId != null && els.viewer.setPointerCapture) {
+    try {
+      els.viewer.setPointerCapture(event.pointerId);
+    } catch {}
+  }
+
   state.dragging = {
     mode: 'handle',
+    pointerId: event.pointerId,
     annotationId: annotation.id,
     handle: handleInfo.handle,
     pointerStart: point,
     annotationSnapshot: cloneAnnotation(annotation),
+    stageRect,
   };
 }
 
 function continueDragging(event) {
-  const point = pointerToArtifactPoint(event);
-  if (!point || !state.dragging) {
+  const dragging = state.dragging;
+  if (!dragging) {
+    return;
+  }
+
+  const point = pointerToArtifactPoint(event, dragging.stageRect);
+  if (!point) {
     return;
   }
 
   const annotation = state.annotations.find(
-    (item) => item.id === state.dragging.annotationId
+    (item) => item.id === dragging.annotationId
   );
   if (!annotation) {
     return;
   }
 
-  const dx = point.x - state.dragging.pointerStart.x;
-  const dy = point.y - state.dragging.pointerStart.y;
+  const dx = point.x - dragging.pointerStart.x;
+  const dy = point.y - dragging.pointerStart.y;
 
-  if (state.dragging.mode === 'move') {
-    applyAnnotationMove(annotation, state.dragging.annotationSnapshot, dx, dy);
+  if (dragging.mode === 'move') {
+    applyAnnotationMove(annotation, dragging.annotationSnapshot, dx, dy);
   }
 
-  if (state.dragging.mode === 'handle') {
+  if (dragging.mode === 'handle') {
     applyHandleMove(
       annotation,
-      state.dragging.annotationSnapshot,
-      state.dragging.handle,
+      dragging.annotationSnapshot,
+      dragging.handle,
       dx,
       dy
     );
   }
 
-  updateStatus();
-  updateInspector();
-  renderAnnotations();
+  patchAnnotationNode(annotation);
+  updateInlineEditorPosition();
 }
 
 function applyAnnotationMove(annotation, snapshot, dx, dy) {
@@ -1184,35 +1319,56 @@ function undoLastAnnotation() {
     );
   }
 
+  const activeAnnotation = getSelectedAnnotation();
+  if (!activeAnnotation || state.selectedAnnotationIds.length !== 1) {
+    closeInlineEditor();
+  }
+
   updateStatus();
   updateInspector();
   renderAnnotations();
 }
 
 function duplicateSelectedAnnotation() {
-  const annotation = getSelectedAnnotation();
-  if (!annotation) {
+  const sourceIds = state.selectedAnnotationIds.length
+    ? state.selectedAnnotationIds
+    : state.selectedAnnotationId
+      ? [state.selectedAnnotationId]
+      : [];
+
+  if (!sourceIds.length) {
     return;
   }
 
-  const duplicate = cloneAnnotation(annotation);
-  duplicate.id = generateAnnotationId();
+  const idSet = new Set(sourceIds);
+  const duplicates = state.annotations
+    .filter((annotation) => idSet.has(annotation.id))
+    .map((annotation) => {
+      const duplicate = cloneAnnotation(annotation);
+      duplicate.id = generateAnnotationId();
 
-  if (duplicate.type === 'rect' || duplicate.type === 'text') {
-    duplicate.x += 16;
-    duplicate.y += 16;
+      if (duplicate.type === 'rect' || duplicate.type === 'text') {
+        duplicate.x += 16;
+        duplicate.y += 16;
+      }
+
+      if (duplicate.type === 'arrow') {
+        duplicate.x1 += 16;
+        duplicate.y1 += 16;
+        duplicate.x2 += 16;
+        duplicate.y2 += 16;
+      }
+
+      return duplicate;
+    });
+
+  if (!duplicates.length) {
+    return;
   }
 
-  if (duplicate.type === 'arrow') {
-    duplicate.x1 += 16;
-    duplicate.y1 += 16;
-    duplicate.x2 += 16;
-    duplicate.y2 += 16;
-  }
-
-  state.annotations.push(duplicate);
-  state.selectedAnnotationId = duplicate.id;
-  state.selectedAnnotationIds = [duplicate.id];
+  state.annotations.push(...duplicates);
+  state.selectedAnnotationId = duplicates[0].id;
+  state.selectedAnnotationIds = duplicates.map((annotation) => annotation.id);
   closeInlineEditor();
   updateStatus();
   renderAnnotations();
@@ -1272,7 +1428,12 @@ function applyAnnotationValue(annotation, value) {
     }
   }
 
+  if (els.annotationMetaInput && document.activeElement !== els.annotationMetaInput) {
+    els.annotationMetaInput.value = getAnnotationDisplayValue(annotation);
+  }
+
   renderAnnotations();
+  updateInspector();
 }
 
 function expandRectToFitLabel(rect) {
@@ -1350,6 +1511,47 @@ function updateToolButtons() {
   if (els.activeTool) {
     els.activeTool.textContent = `Tool: ${state.tool}`;
   }
+}
+
+function updateInspector() {
+  if (!els.inspectorEmpty || !els.inspectorContent || !els.inspectorType || !els.annotationMetaInput || !els.inspectorLabel) {
+    return;
+  }
+
+  const hasSingleSelection = state.selectedAnnotationIds.length === 1;
+  const annotation = hasSingleSelection ? getSelectedAnnotation() : null;
+
+  els.inspectorEmpty.classList.toggle('hidden', Boolean(annotation));
+  els.inspectorContent.classList.toggle('hidden', !annotation);
+
+  if (!annotation) {
+    els.annotationMetaInput.value = '';
+    els.annotationMetaInput.disabled = true;
+    if (state.selectedAnnotationIds.length > 1) {
+      els.inspectorEmpty.textContent = `Selected ${state.selectedAnnotationIds.length} annotations. Edit one at a time.`;
+    } else {
+      els.inspectorEmpty.textContent = 'Select an annotation to inspect its details.';
+    }
+    return;
+  }
+
+  const isTextAnnotation = annotation.type === 'text';
+  els.inspectorType.textContent = isTextAnnotation
+    ? 'Text annotation'
+    : annotation.type === 'rect'
+      ? 'Rectangle annotation'
+      : 'Arrow annotation';
+  els.inspectorLabel.textContent = isTextAnnotation ? 'Text content' : 'Annotation note';
+  els.annotationMetaInput.disabled = false;
+  els.annotationMetaInput.value = getAnnotationDisplayValue(annotation);
+}
+
+function getAnnotationDisplayValue(annotation) {
+  if (!annotation) {
+    return '';
+  }
+
+  return annotation.type === 'text' ? annotation.text || '' : annotation.label || '';
 }
 
 function updateStatus() {
@@ -1438,8 +1640,10 @@ function openInlineEditor(annotationId) {
 
   els.inlineEditorInput.value = state.inlineEditor.value;
   els.inlineEditor.classList.remove('hidden');
+  updateInlineEditorPosition();
 
   window.requestAnimationFrame(() => {
+    updateInlineEditorPosition();
     els.inlineEditorInput.focus();
     const value = els.inlineEditorInput.value || '';
     els.inlineEditorInput.setSelectionRange(value.length, value.length);
@@ -1453,16 +1657,22 @@ function closeInlineEditor() {
   state.inlineEditor.value = '';
   if (els.inlineEditor) {
     els.inlineEditor.classList.add('hidden');
+    els.inlineEditor.style.left = '';
+    els.inlineEditor.style.top = '';
   }
 }
 
 function saveInlineEditor() {
-  const annotation = getSelectedAnnotation();
-  if (!annotation || state.selectedAnnotationIds.length > 1) {
+  const annotation = state.annotations.find(
+    (item) => item.id === state.inlineEditor.annotationId
+  );
+  if (!annotation) {
     closeInlineEditor();
     return;
   }
 
+  state.selectedAnnotationId = annotation.id;
+  state.selectedAnnotationIds = [annotation.id];
   applyAnnotationValue(
     annotation,
     els.inlineEditorInput ? els.inlineEditorInput.value : state.inlineEditor.value
@@ -1493,6 +1703,37 @@ function getAnnotationEditorPoint(annotation) {
   };
 }
 
+function updateInlineEditorPosition() {
+  if (!state.inlineEditor.open || !els.inlineEditor || !els.viewer) {
+    return;
+  }
+
+  const annotation = state.annotations.find(
+    (item) => item.id === state.inlineEditor.annotationId
+  );
+  if (!annotation) {
+    closeInlineEditor();
+    return;
+  }
+
+  const point = getAnnotationEditorPoint(annotation);
+  state.inlineEditor.x = point.x;
+  state.inlineEditor.y = point.y;
+
+  const editorWidth = els.inlineEditor.offsetWidth || 280;
+  const editorHeight = els.inlineEditor.offsetHeight || 180;
+  const margin = 12;
+  const rawLeft = point.x * state.zoom - els.viewer.scrollLeft;
+  const rawTop = point.y * state.zoom - els.viewer.scrollTop;
+  const maxLeft = Math.max(els.viewer.clientWidth - editorWidth - margin, margin);
+  const maxTop = Math.max(els.viewer.clientHeight - editorHeight - margin, margin);
+  const left = Math.min(Math.max(rawLeft, margin), maxLeft);
+  const top = Math.min(Math.max(rawTop, margin), maxTop);
+
+  els.inlineEditor.style.left = `${left}px`;
+  els.inlineEditor.style.top = `${top}px`;
+}
+
 let _renderScheduled = false;
 function scheduleRenderAnnotations() {
   if (_renderScheduled) return;
@@ -1508,7 +1749,8 @@ function scheduleRenderAnnotations() {
 }
 
 function performRenderAnnotations() {
-  // Minimal DOM churn: clear layer then append fresh nodes
+  annotationNodeCache.clear();
+
   while (els.annotationLayer.firstChild) {
     els.annotationLayer.removeChild(els.annotationLayer.firstChild);
   }
@@ -1552,6 +1794,7 @@ function buildAnnotationNode(annotation) {
     appendTextNode(group, annotation);
   }
 
+  annotationNodeCache.set(annotation.id, group);
   return group;
 }
 
@@ -2297,8 +2540,13 @@ function onWindowResize() {
   syncStageGeometry();
   syncArtifactMetrics();
   applyZoom(true);
+  updateInlineEditorPosition();
   updateStatus();
   renderAnnotations();
+}
+
+function onViewerScroll() {
+  updateInlineEditorPosition();
 }
 
 function onKeyDown(event) {
@@ -2387,7 +2635,14 @@ function onKeyUp(event) {
 }
 
 function onViewerWheel(event) {
+  if (event.target && event.target.closest && event.target.closest('#inline-editor')) {
+    return;
+  }
+
   if (!(event.metaKey || event.ctrlKey)) {
+    event.preventDefault();
+    els.viewer.scrollLeft += event.deltaX;
+    els.viewer.scrollTop += event.deltaY;
     return;
   }
 
@@ -2448,6 +2703,7 @@ function applyZoom(skipAnchorAdjust, previousZoom = state.zoom, options = {}) {
       (anchorY - els.viewer.getBoundingClientRect().top);
   }
 
+  updateInlineEditorPosition();
   updateStatus();
 }
 
@@ -2472,14 +2728,14 @@ function syncArtifactMetrics() {
   };
 }
 
-function pointerToArtifactPoint(event) {
+function pointerToArtifactPoint(event, stageRect = null) {
   if (!state.artifactMetrics) {
     return null;
   }
 
-  const stageRect = els.viewerStage.getBoundingClientRect();
-  const x = (event.clientX - stageRect.left) / state.zoom;
-  const y = (event.clientY - stageRect.top) / state.zoom;
+  const resolvedStageRect = stageRect || els.viewerStage.getBoundingClientRect();
+  const x = (event.clientX - resolvedStageRect.left) / state.zoom;
+  const y = (event.clientY - resolvedStageRect.top) / state.zoom;
 
   return {
     x,
@@ -2576,6 +2832,34 @@ function findHandleInfo(target) {
     annotationId: target.dataset.annotationId,
     handle: target.dataset.handle,
   };
+}
+
+function patchAnnotationNode(annotation) {
+  const group = annotationNodeCache.get(annotation.id);
+  if (!group) {
+    renderAnnotations();
+    return;
+  }
+
+  const freshNode = buildAnnotationNode(annotation);
+  annotationNodeCache.set(annotation.id, freshNode);
+  group.replaceWith(freshNode);
+}
+
+function releaseViewerPointerCapture(event) {
+  if (
+    !event ||
+    event.pointerId == null ||
+    !els.viewer.releasePointerCapture ||
+    !els.viewer.hasPointerCapture ||
+    !els.viewer.hasPointerCapture(event.pointerId)
+  ) {
+    return;
+  }
+
+  try {
+    els.viewer.releasePointerCapture(event.pointerId);
+  } catch {}
 }
 
 function cloneAnnotation(annotation) {

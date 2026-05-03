@@ -10,14 +10,26 @@ function ensureDir(dirPath) {
   return dirPath;
 }
 
+function getProjectRoot() {
+  return path.resolve(__dirname, '..', '..');
+}
+
+function getTmpDir() {
+  return ensureDir(path.join(getProjectRoot(), 'tmp'));
+}
+
+function getGeneratedArtifactsDir() {
+  return ensureDir(path.join(getTmpDir(), '.artifact'));
+}
+
+function getArtifactManifestPath() {
+  return path.join(getTmpDir(), 'manifest.json');
+}
+
 function getBaseDir() {
   return ensureDir(
     path.join(os.homedir(), 'Library', 'Application Support', APP_NAME)
   );
-}
-
-function getResultsDir() {
-  return ensureDir(path.join(getBaseDir(), 'results'));
 }
 
 function getExportsDir() {
@@ -28,40 +40,18 @@ function getStateFilePath() {
   return path.join(getBaseDir(), 'state.json');
 }
 
-function getResultFilePath(requestId) {
-  return path.join(getResultsDir(), `${requestId}.json`);
-}
-
 function getExportRoot(requestId) {
   return ensureDir(path.join(getExportsDir(), requestId));
 }
 
-function getProjectRoot() {
-  return path.resolve(__dirname, '..', '..');
-}
-
-function getTmpDir() {
-  return ensureDir(path.join(getProjectRoot(), 'tmp'));
-}
-
-function getGeneratedFilesManifestPath() {
-  return path.join(getTmpDir(), 'manifest.json');
-}
-
-function getRequestTmpDir(requestId) {
-  return ensureDir(path.join(getTmpDir(), 'requests', requestId));
-}
-
 module.exports = {
   ensureDir,
-  getBaseDir,
-  getResultsDir,
-  getExportsDir,
-  getStateFilePath,
-  getResultFilePath,
-  getExportRoot,
   getProjectRoot,
   getTmpDir,
-  getGeneratedFilesManifestPath,
-  getRequestTmpDir,
+  getGeneratedArtifactsDir,
+  getArtifactManifestPath,
+  getBaseDir,
+  getExportsDir,
+  getStateFilePath,
+  getExportRoot,
 };

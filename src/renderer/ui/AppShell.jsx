@@ -286,24 +286,22 @@ export function AppShell() {
             <div id="viewer-stage" className="viewer-stage">
               <div id="artifact-host" className="artifact-host" />
               <svg id="annotation-layer" className="annotation-layer" />
-              <div id="inline-editor" className="inline-editor hidden">
-                <div className="slide-backdrop" id="inline-editor-backdrop"></div>
-                <div className="slide-panel" role="dialog" aria-modal="true">
-                  <div className="slide-panel-header">
-                    <div id="inline-editor-title" className="slide-panel-title">Edit note</div>
-                    <button id="inline-editor-close" className="tool-btn" aria-label="Close inline editor">✕</button>
-                  </div>
-                  <div className="slide-panel-body">
-                    <textarea
-                      id="inline-editor-input"
-                      rows="4"
-                      placeholder="Write note directly on design..."
-                    />
-                    <div className="inline-editor-actions">
-                      <button id="inline-editor-save" className="tool-btn" type="button">Save</button>
-                      <button id="inline-editor-cancel" className="tool-btn" type="button">Cancel</button>
-                    </div>
-                  </div>
+            </div>
+            <div id="inline-editor" className="inline-editor hidden" role="dialog" aria-modal="false">
+              <div id="inline-editor-backdrop" className="hidden" aria-hidden="true" />
+              <div className="inline-editor-card">
+                <div className="inline-editor-header">
+                  <div id="inline-editor-title" className="inline-editor-title">Edit note</div>
+                  <button id="inline-editor-close" className="tool-btn icon-btn inline-editor-close" aria-label="Close inline editor" type="button">✕</button>
+                </div>
+                <textarea
+                  id="inline-editor-input"
+                  rows="4"
+                  placeholder="Write note directly on design..."
+                />
+                <div className="inline-editor-actions">
+                  <button id="inline-editor-save" className="tool-btn" type="button">Save</button>
+                  <button id="inline-editor-cancel" className="tool-btn" type="button">Cancel</button>
                 </div>
               </div>
             </div>
@@ -312,39 +310,59 @@ export function AppShell() {
 
         <aside className="review-panel">
           <div id="generated-files" className="artifact-dropdown artifact-dropdown-single review-panel-dropdown">
-            <button
-              id="artifact-picker-toggle"
-              className="tool-btn artifact-picker-toggle artifact-picker-toggle-single"
-              type="button"
-              aria-label="Open artifact list"
-              aria-haspopup="menu"
-              aria-expanded="false"
-            >
-              <div className="artifact-picker-single-main">
-                <span id="artifact-picker-current" className="hidden">No artifact selected</span>
-                <div className="current-artifact-title-row current-artifact-title-row-single">
-                  <FileCode2 aria-hidden="true" />
-                  <div className="current-artifact-copy">
-                    <div id="current-artifact-title" className="current-artifact-title">No active artifact</div>
-                    <div id="current-artifact-meta" className="current-artifact-meta">Waiting for request…</div>
+            <div className="artifact-picker-anchor">
+              <button
+                id="artifact-picker-toggle"
+                className="tool-btn artifact-picker-toggle artifact-picker-toggle-single"
+                type="button"
+                aria-label="Open artifact list"
+                aria-haspopup="menu"
+                aria-expanded="false"
+              >
+                <div className="artifact-picker-single-main">
+                  <span id="artifact-picker-current" className="hidden">No artifact selected</span>
+                  <div className="current-artifact-title-row current-artifact-title-row-single">
+                    <FileCode2 aria-hidden="true" />
+                    <div className="current-artifact-copy">
+                      <div id="current-artifact-title" className="current-artifact-title">No active artifact</div>
+                      <div id="current-artifact-meta" className="current-artifact-meta">Waiting for request…</div>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <ChevronDown className="draw-tool-chevron" aria-hidden="true" />
-            </button>
+                <ChevronDown className="draw-tool-chevron" aria-hidden="true" />
+              </button>
 
-            <div
-              id="artifact-picker-menu"
-              className="popover-card artifact-picker-menu hidden"
-              role="menu"
-              aria-label="Artifact files"
-            >
-              <div id="generated-files-empty" className="inspector-empty artifact-picker-empty">
-                No generated files yet.
+              <div
+                id="artifact-picker-menu"
+                className="popover-card artifact-picker-menu hidden"
+                role="menu"
+                aria-label="Artifact files"
+              >
+                <div id="generated-files-empty" className="inspector-empty artifact-picker-empty">
+                  No generated files yet.
+                </div>
+                <div id="generated-files-list" className="generated-files-list hidden" />
               </div>
-              <div id="generated-files-list" className="generated-files-list hidden" />
             </div>
           </div>
+
+          <section id="annotation-inspector" className="hidden" aria-hidden="true">
+            <div className="inspector-title">Annotation inspector</div>
+            <div id="inspector-empty" className="inspector-empty">
+              Select an annotation to inspect its details.
+            </div>
+            <div id="inspector-content" className="inspector-content hidden">
+              <div id="inspector-type" className="inspector-type">Annotation</div>
+              <label className="field field-grow">
+                <span id="inspector-label">Annotation text</span>
+                <textarea
+                  id="annotation-meta-input"
+                  rows="5"
+                  placeholder="Double click annotation to edit, or update here..."
+                />
+              </label>
+            </div>
+          </section>
 
           <section className="inspector-card review-actions-card">
             <div className="inspector-title">Review action</div>

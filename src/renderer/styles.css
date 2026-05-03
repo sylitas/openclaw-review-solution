@@ -31,6 +31,14 @@
   box-sizing: border-box;
 }
 
+svg,
+.annotation,
+.annotation *,
+.annotation-layer {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 html,
 body {
   height: 100%;
@@ -328,6 +336,7 @@ body {
 /* ── Viewer ── */
 
 .viewer {
+  position: relative;
   height: 100%;
   min-height: 600px;
   padding: 0;
@@ -384,9 +393,11 @@ body {
 
 .inline-editor {
   position: absolute;
-  z-index: 20;
+  z-index: 40;
   min-width: 240px;
+  width: min(320px, calc(100% - 24px));
   max-width: 320px;
+  pointer-events: auto;
 }
 
 .inline-editor-card {
@@ -401,12 +412,25 @@ body {
   backdrop-filter: blur(8px);
 }
 
+.inline-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .inline-editor-title {
   color: var(--text);
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.inline-editor-close {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
 }
 
 #inline-editor-input {
@@ -432,11 +456,13 @@ body {
   stroke-width: 2;
 }
 
+.annotation.is-selected .annotation-rect,
 .annotation-group.is-selected .annotation-rect {
   stroke: #5b8cff;
   stroke-width: 2.5;
 }
 
+.annotation.annotation-draft .annotation-rect,
 .annotation-group.is-draft .annotation-rect {
   stroke-dasharray: 6 3;
 }
@@ -448,6 +474,7 @@ body {
   stroke-linecap: butt;
 }
 
+.annotation.is-selected .annotation-arrow,
 .annotation-group.is-selected .annotation-arrow {
   stroke: #5b8cff;
   stroke-width: 3.5;
@@ -457,6 +484,7 @@ body {
   fill: #6680cc;
 }
 
+.annotation.is-selected .annotation-arrow-head,
 .annotation-group.is-selected .annotation-arrow-head {
   fill: #5b8cff;
 }
@@ -649,6 +677,11 @@ body {
   margin-bottom: 16px;
 }
 
+.artifact-picker-anchor {
+  position: relative;
+  width: 100%;
+}
+
 .artifact-picker-toggle-single {
   width: 100%;
   padding: 12px 14px;
@@ -685,10 +718,9 @@ body {
   top: calc(100% + 4px);
   left: 0;
   right: auto;
-  /* Let the menu size to its content, but ensure it doesn't overflow the viewport */
-  width: auto;
-  min-width: 160px;
-  max-width: min(360px, calc(100vw - 48px));
+  width: 100%;
+  min-width: 0;
+  max-width: none;
   padding: 10px;
   box-sizing: border-box;
 }
@@ -831,6 +863,11 @@ textarea:disabled {
 #message {
   min-height: 160px;
   max-height: 220px;
+}
+
+#annotation-meta-input {
+  min-height: 120px;
+  max-height: 240px;
 }
 
 .review-actions-card {
